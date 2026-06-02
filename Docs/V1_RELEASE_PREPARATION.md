@@ -8,8 +8,8 @@
 ## Pre-Release Checklist (June 15-19)
 
 ### June 15: Release Artifacts
-- [ ] Finalize app icon
-- [ ] Create GitHub release screenshots
+- [x] Finalize app icon
+- [x] Create GitHub release screenshots
 - [ ] Draft release notes
 - [ ] Prepare social media announcements
 - [ ] Create demo video (optional)
