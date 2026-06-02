@@ -1,0 +1,12 @@
+.DS_Store
+.build/
+dist/
+Archive.zip
+*.dSYM
+DerivedData/
+Packages/
+.swiftpm/
+.vscode/
+.idea/
+*.swp
+*.lock

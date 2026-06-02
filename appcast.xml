@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <channel>
+        <title>DotWeaver</title>
+        <link>https://github.com/rausth/DotWeaver</link>
+        <description>Most recent changes with links to updates.</description>
+        <language>en</language>
+        
+        <item>
+            <title>Version 1.0.0</title>
+            <link>https://github.com/rausth/DotWeaver/releases/tag/v1.0.0</link>
+            <sparkle:version>1000</sparkle:version>
+            <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+            <description><![CDATA[
+                <h2>DotWeaver v1.0.0 - Initial Release</h2>
+                
+                <h3>✨ New Features</h3>
+                <ul>
+                    <li>Native SwiftUI macOS application</li>
+                    <li>Support for 9 storage providers (Git, iCloud, OneDrive, Google Drive, Dropbox, WebDAV, SFTP, FTPS, S3)</li>
+                    <li>Touch ID / Face ID biometric authentication with passcode fallback</li>
+                    <li>Secure Enclave optional private key for signing operations</li>
+                    <li>Built-in file editor with syntax highlighting</li>
+                    <li>Template system (Chezmoi-style)</li>
+                    <li>Full CLI tool (dotweaver)</li>
+                    <li>Homebrew installation support</li>
+                    <li>Automatic updates via Sparkle</li>
+                </ul>
+                
+                <h3>🔒 Security</h3>
+                <ul>
+                    <li>App Sandbox with Home Folder Access only</li>
+                    <li>Keychain integration with Access Groups</li>
+                    <li>Certificate pinning for network security</li>
+                    <li>Zero telemetry - your data stays private</li>
+                </ul>
+                
+                <h3>📦 Installation</h3>
+                <pre><code>brew tap rausth/dotweaver
+brew install dotweaver</code></pre>
+                
+                <p><strong>Full Changelog:</strong> <a href="https://github.com/rausth/DotWeaver/blob/main/CHANGELOG.md">View on GitHub</a></p>
+            ]]></description>
+            <pubDate>Thu, 28 May 2026 10:00:00 +0000</pubDate>
+            <enclosure 
+                url="https://github.com/rausth/DotWeaver/releases/download/v1.0.0/DotWeaver-macOS.tar.gz" 
+                sparkle:version="1000" 
+                sparkle:shortVersionString="1.0.0" 
+                length="22557" 
+                type="application/octet-stream" />
+        </item>
+    </channel>
+</rss>
