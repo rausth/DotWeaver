@@ -53,12 +53,12 @@ DotWeaver follows a **modular, layered architecture** optimized for macOS native
 | **Language** | Swift | 6.0 | Modern concurrency, type safety, native performance |
 | **UI Framework** | SwiftUI | macOS 15+ | Declarative UI, native integration, Dark Mode support |
 | **Architecture** | MVVM + Actors | - | Testability, thread safety, state management |
-| **Security** | Keychain Services, LocalAuthentication, CryptoKit | - | Hardware-backed storage, biometric auth, encryption |
+| **Security** | Keychain Services, LocalAuthentication, CryptoKit, Secure Enclave | - | Secure Enclave-wrapped vault key when available, Keychain fallback, biometric auth, AES.GCM encryption |
 | **Networking** | URLSession, NIO SSH (optional) | - | Native async networking, certificate pinning |
 | **Testing** | XCTest, Swift Testing | - | Unit, integration, and UI testing |
 | **Build System** | Swift Package Manager | 6.0 | Single source of truth, multi-target support |
 | **CI/CD** | GitHub Actions | - | Automated builds, tests, notarization, releases |
-| **Distribution** | Homebrew, Direct Download, Sparkle | - | Multiple distribution channels, auto-updates |
+| **Distribution** | Direct Download, Sparkle | - | GitHub release download and automatic updates |
 
 ## 3. Data Models
 
@@ -92,7 +92,7 @@ enum ConflictStrategy: String, Codable, CaseIterable {
 Each provider implements `SyncProviderProtocol` with:
 - Configuration stored in UserDefaults (non-sensitive)
 - Credentials stored in Keychain with biometric protection
-- Optional Secure Enclave key for signing operations
+- Vault master key wrapped by Secure Enclave when available, with Keychain-only fallback
 
 ## 4. Security Architecture
 
@@ -104,24 +104,23 @@ BiometricAuthenticator.authenticate()
         ↓
 CredentialManager.getPassword()
         ↓
-Keychain Services (with Access Group)
+Keychain Services
         ↓
-Secure Enclave (if biometric required)
+Vault master key / provider credential
 ```
 
-### 4.2 Network Security
-- All HTTP providers use `SecureURLSession` with:
-  - Certificate pinning for known providers
-  - TLS 1.3 enforcement
-  - 30-second timeout with exponential backoff
-- SSH/SFTP uses system OpenSSH with key-based auth
+### 4.2 Provider Transport
+- Git push/pull uses the system `git` binary and the configured repository remote.
+- iCloud, OneDrive, Google Drive, and Dropbox rely on their desktop sync folders.
+- WebDAV, SFTP, FTPS, and S3 support user-provided mounted/synchronized folders.
+- WebDAV, SFTP, FTPS, and S3 also support Native Protocol mode through system `curl`.
+- Embedded SDK/native-library clients are future work.
 
 ### 4.3 Sandbox Entitlements
 ```xml
 com.apple.security.app-sandbox: true
 com.apple.security.files.user-home.read-write: true
 com.apple.security.network.client: true
-keychain-access-groups: ["$(TeamIdentifierPrefix)com.rausth.DotWeaver"]
 ```
 
 ## 5. Concurrency Model
@@ -153,22 +152,23 @@ keychain-access-groups: ["$(TeamIdentifierPrefix)com.rausth.DotWeaver"]
 ## 8. Deployment Architecture
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│   GitHub    │────▶│ GitHub Actions│────▶│   Homebrew  │
-│  (Source)   │     │  (CI/CD)      │     │   (tap)     │
-└─────────────┘     └──────────────┘     └─────────────┘
-       │                    │                    │
-       │                    ▼                    │
-       │            ┌──────────────┐            │
-       │            │  Notarization │            │
-       │            │   + Sparkle   │            │
-       │            └──────────────┘            │
-       │                    │                    │
-       ▼                    ▼                    ▼
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│   Direct    │     │  Auto-Update │     │   Users     │
-│  Download   │◀────│   (Sparkle)  │◀────│ (macOS 15+) │
-└─────────────┘     └──────────────┘     └─────────────┘
+┌─────────────┐     ┌──────────────┐     ┌──────────────┐
+│   GitHub    │────▶│ GitHub Actions│────▶│ Notarization │
+│  (Source)   │     │  (CI/CD)      │     │  + Stapling  │
+└─────────────┘     └──────────────┘     └──────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │ GitHub Releases │
+                    │ app zip + CLI   │
+                    └─────────────────┘
+                              │
+              ┌───────────────┴───────────────┐
+              ▼                               ▼
+       ┌─────────────┐                ┌──────────────┐
+       │   Direct    │                │  Auto-Update │
+       │  Download   │                │   (Sparkle)  │
+       └─────────────┘                └──────────────┘
 ```
 
 ---

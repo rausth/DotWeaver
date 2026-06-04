@@ -31,6 +31,7 @@ struct SnapshotsView: View {
                 .background(Color.blue)
                 .foregroundColor(.white)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
+                .accessibilityIdentifier("snapshots.takeSnapshot")
             }
             .padding(32)
             
@@ -85,6 +86,7 @@ struct SnapshotsView: View {
                 TextField("Snapshot Name", text: $snapshotName)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 250)
+                    .accessibilityIdentifier("snapshots.name")
                 
                 HStack {
                     Button("Cancel") {
@@ -92,12 +94,14 @@ struct SnapshotsView: View {
                         snapshotName = ""
                     }
                     .buttonStyle(.bordered)
+                    .accessibilityIdentifier("snapshots.cancel")
                     
                     Button("Create") {
                         create()
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(snapshotName.isEmpty)
+                    .accessibilityIdentifier("snapshots.create")
                 }
             }
             .padding(40)
@@ -112,24 +116,34 @@ struct SnapshotsView: View {
     
     private func create() {
         do {
-            _ = try manager.createSnapshot(dotfiles: viewModel.dotfiles, name: snapshotName)
+            let name = snapshotName
+            _ = try manager.createSnapshot(dotfiles: viewModel.dotfiles, name: name, providerRootPath: currentProviderRootPath())
             loadSnapshots()
             isCreatingSnapshot = false
             snapshotName = ""
             statusMessage = "Snapshot created successfully"
-            viewModel.addActivityLog(message: "Created snapshot: \(snapshotName)", type: .add)
+            viewModel.addActivityLog(message: "Created snapshot: \(name)", type: .add)
         } catch {
             statusMessage = "Failed to create snapshot: \(error.localizedDescription)"
         }
     }
     
     private func restore(_ snapshot: Snapshot) {
-        do {
-            try manager.restoreSnapshot(snapshot)
-            statusMessage = "Restored snapshot successfully"
-            viewModel.addActivityLog(message: "Restored snapshot: \(snapshot.name)", type: .sync)
-        } catch {
-            statusMessage = "Failed to restore: \(error.localizedDescription)"
+        Task {
+            do {
+                if SecurityPolicy.requiresBiometricAuthentication {
+                    _ = try await BiometricAuthenticator.shared.authenticate(reason: "Authenticate to restore snapshot")
+                }
+                try manager.restoreSnapshot(snapshot)
+                await MainActor.run {
+                    statusMessage = "Restored snapshot successfully"
+                    viewModel.addActivityLog(message: "Restored snapshot: \(snapshot.name)", type: .sync)
+                }
+            } catch {
+                await MainActor.run {
+                    statusMessage = "Failed to restore: \(error.localizedDescription)"
+                }
+            }
         }
     }
     
@@ -141,6 +155,10 @@ struct SnapshotsView: View {
         } catch {
             statusMessage = "Failed to delete: \(error.localizedDescription)"
         }
+    }
+
+    private func currentProviderRootPath() -> String? {
+        viewModel.selectedProvider == .git ? viewModel.gitLocalPath : viewModel.cloudSyncPath
     }
 }
 

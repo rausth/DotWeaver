@@ -69,15 +69,13 @@ struct TemplatesView: View {
     }
     
     private func applyTemplate(_ template: DotTemplate) {
-        let expandedPath = (template.defaultPath as NSString).expandingTildeInPath
+        let url = URL(fileURLWithPath: (template.defaultPath as NSString).expandingTildeInPath)
         
         do {
-            // Ensure directory exists
-            let directory = (expandedPath as NSString).deletingLastPathComponent
-            try FileManager.default.createDirectory(atPath: directory, withIntermediateDirectories: true)
-            
-            // Write content
-            try template.content.write(toFile: expandedPath, atomically: true, encoding: .utf8)
+            guard let data = template.content.data(using: .utf8) else {
+                throw NSError(domain: "DotWeaver.Templates", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unable to encode template content"])
+            }
+            try SyncPathSecurity.writeFileAtomically(data, to: url)
             
             // Add to viewModel if not already there
             if !viewModel.dotfiles.contains(where: { $0.path == template.defaultPath }) {

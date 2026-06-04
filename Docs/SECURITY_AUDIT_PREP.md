@@ -63,8 +63,8 @@
 
 | Vector | Likelihood | Impact | Mitigation |
 |--------|------------|--------|------------|
-| Keychain Access | Low | High | Access Groups, Biometric |
-| Network MITM | Medium | Medium | TLS 1.3, Certificate Pinning |
+| Keychain Access | Low | High | Device-local Keychain, biometric gate |
+| External sync transport compromise | Medium | Medium | Use trusted desktop clients or mount tools |
 | Sandbox Escape | Low | High | Minimal entitlements |
 | Code Injection | Low | High | Hardened runtime |
 | Credential Phishing | Medium | High | No password prompts in UI |
@@ -79,7 +79,7 @@
 - Touch ID / Face ID via LocalAuthentication
 - Passcode fallback
 - Keychain item ACLs
-- Secure Enclave for signing keys
+- Keychain-protected vault master key
 
 **Evidence:**
 - BiometricAuthenticator.swift
@@ -91,23 +91,25 @@
 **Controls:**
 - App Sandbox (com.apple.security.app-sandbox)
 - Home Folder Access only (no Full Disk Access)
-- Keychain with kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+- Security-scoped bookmarks for GUI-selected resources
+- Keychain with kSecAttrAccessibleWhenUnlockedThisDeviceOnly
 - No iCloud Keychain sync for sensitive items
 
 **Evidence:**
 - DotWeaver.entitlements
 - Package.swift linker settings
 
-### 3. Network Security
+### 3. Provider Transport
 
 **Controls:**
-- TLS 1.3 enforcement
-- Certificate pinning (GitHub, major providers)
-- 30-second timeout
-- No plaintext HTTP
+- Git transport delegated to system Git.
+- Cloud and remote-style providers use local mounted or synchronized folders.
+- No provider passwords are collected by folder-backed provider UI.
 
 **Evidence:**
-- SecureURLSession.swift (to be implemented)
+- GitProvider.swift
+- FolderSyncProvider.swift
+- Provider setup documentation
 - Provider implementations
 
 ### 4. Input Validation
@@ -167,7 +169,7 @@ Expected: Permission denied (sandbox violation)
 #### 5. Credential Extraction
 ```
 Test: Attempt to read Keychain items from another app
-Expected: Access denied (Keychain Access Group mismatch)
+Expected: Access denied (service/account scope and Keychain protections)
 ```
 
 #### 6. Code Injection

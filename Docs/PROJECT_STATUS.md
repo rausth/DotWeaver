@@ -1,168 +1,58 @@
-# DotWeaver Project Status - FINAL
+# DotWeaver Project Status
 
-**Date:** June 2, 2026  
-**Version:** 1.0.0  
-**Status:** ✅ 100% COMPLETE - VERIFIED
+**Date:** June 4, 2026
+**Version:** 1.0.0 candidate
+**Status:** Functional release candidate; live notarization is excluded from local implementation and still requires Apple Developer credentials.
 
----
+## Current Implementation
 
-## Executive Summary
+| Area | Status | Notes |
+|------|--------|-------|
+| SwiftUI macOS app | Implemented | Main app, settings, onboarding, menu bar |
+| State management | Implemented | `StateManager` + `DotfilesViewModel` |
+| Folder-backed providers | Implemented | iCloud, OneDrive, Google Drive, Dropbox, WebDAV, SFTP, FTPS, S3 |
+| Native protocol providers | Implemented | WebDAV/SFTP/FTPS/S3 through system `curl` endpoint transfer |
+| Git provider | Implemented | Local folder sync plus `git pull` / `git push` |
+| Conflict resolution | Implemented | Reads local and stored file copies; applies selected strategy |
+| CLI | Implemented | Files, sync, providers, native config, Git config, snapshots, conflicts, doctor, hooks, templates, interop |
+| Snapshots | Implemented | Preserves nested paths and syncs snapshot copies to provider folder |
+| Machine/version manifests | Implemented | Machine identity, file manifest, per-file version records |
+| Vault encryption | Implemented | AES.GCM payloads, master key stored in Keychain |
+| Sensitive auth gates | Implemented | Vaulted sync, snapshot restore, credential reads |
+| Hook policy | Implemented | Hooks disabled by default; audited when skipped/executed |
+| Tests | Passing | Unit/integration tests cover core provider, vault, snapshot, native endpoint safety, Git remote behavior, provider permissions, shared restore, and interop parsing |
+| Release packaging | Implemented | Universal app/CLI artifacts, Sparkle framework embedding, appcast generation, local signature/rpath verification |
+| Smoke validation | Implemented | Provider matrix, app launch, local appcast, hosted Sparkle appcast, signature, rpath, checksum, and CLI help validators |
+| Native remote protocol clients | Implemented | WebDAV/SFTP/FTPS/S3 endpoint transfer via system `curl`; embedded SDK clients are not included |
 
-DotWeaver is a complete, production-ready macOS application for managing dotfiles. All planned features have been implemented, all documentation has been created, and all processes have been defined. The codebase has been verified with a full suite of passing tests.
+## Provider Storage
 
-**Overall Completion: 100%**
+Managed files are stored under:
 
----
+```text
+<provider folder>/.dotweaver/files/
+<provider folder>/.dotweaver/manifests/
+<provider folder>/.dotweaver/versions/
+<provider folder>/.dotweaver/snapshots/
+```
 
-## What's Complete
+For cloud and remote-style providers, synchronization to the remote service is handled by either selected desktop client/mount tool or Native Protocol mode.
 
-### ✅ Core Application (100%)
+## Release Risks
 
-| Feature | Status | Files |
-|---------|--------|-------|
-| Native SwiftUI macOS application | ✅ Complete | DotWeaverApp.swift, ContentView.swift |
-| MVVM architecture with DI | ✅ Complete | DotfilesViewModel.swift |
-| **Real provider implementations** | ✅ Complete | 9 providers (Git, iCloud, OneDrive, Google Drive, Dropbox, WebDAV, SFTP, FTPS, S3) |
-| **Template engine** | ✅ Complete | TemplateEngine.swift |
-| **File editor with syntax highlighting** | ✅ Complete | FileEditorView.swift |
-| **Conflict resolution UI** | ✅ Complete | ConflictResolutionView.swift |
-| **Full CLI commands** | ✅ Complete | Commands.swift (7 commands) |
-| **Settings view** | ✅ Complete | SettingsView.swift |
-| In-app license viewer | ✅ Complete | LicenseView.swift |
-| Sparkle auto-update integration | ✅ Complete | UpdateManager.swift |
-| Touch ID / Face ID authentication | ✅ Complete | BiometricAuthenticator.swift |
-| Keychain credential management | ✅ Complete | CredentialManager.swift |
-| App Sandbox (Home Folder Access) | ✅ Complete | DotWeaver.entitlements |
+- GUI launch smoke is scripted; full interactive UI automation still depends on macOS Accessibility permission.
+- Native Protocol mode depends on system `curl` and user-provided credential setup.
+- Mackup/chezmoi interop covers common import/export paths; full preset catalogs and advanced template/script semantics remain v1.x growth work.
+- Secure Enclave wrapping is opportunistic: supported hardware uses Secure Enclave wrapping; unsupported hardware falls back to Keychain-only storage.
+- Live notarization requires Apple Developer credentials. Live hosted Sparkle validation requires Sparkle signing key and hosted release assets.
 
-### ✅ Testing (100%)
+## Last Verified
 
-| Test Type | Status | Coverage |
-|-----------|--------|----------|
-| Unit tests | ✅ Complete | 85%+ target |
-| Integration tests | ✅ Complete | Full sync flow, biometric, credentials |
-| Performance tests | ✅ Complete | 500+ files, memory, templates |
-| Mock provider | ✅ Complete | MockSyncProvider.swift |
+```bash
+swift test
+script/smoke_provider_matrix.sh
+script/validate_release_local.sh
+script/smoke_app_ui.sh
+```
 
-### ✅ Documentation (100%)
-
-| Document | Status | Format |
-|----------|--------|--------|
-| REQUIREMENTS.md | ✅ Complete | MD + PDF |
-| SPECS.md | ✅ Complete | MD + PDF |
-| IMPLEMENTATION_PLAN.md | ✅ Complete | MD + PDF |
-| CHANGELOG.md | ✅ Complete | MD + PDF |
-| CONTRIBUTING.md | ✅ Complete | MD + PDF |
-| SECURITY.md | ✅ Complete | MD + PDF |
-| CODE_OF_CONDUCT.md | ✅ Complete | MD + PDF |
-| DOCUMENTATION.md | ✅ Complete | MD + PDF |
-| NEXT_STEPS.md | ✅ Complete | MD |
-| BETA_TESTING_PROGRAM.md | ✅ Complete | MD |
-| BETA_TESTING_EXECUTION.md | ✅ Complete | MD |
-| SECURITY_AUDIT.md | ✅ Complete | MD |
-| SECURITY_AUDIT_PREP.md | ✅ Complete | MD |
-| SECURITY_AUDIT_EXECUTION.md | ✅ Complete | MD |
-| PERFORMANCE_VALIDATION.md | ✅ Complete | MD |
-| FINAL_POLISH_CHECKLIST.md | ✅ Complete | MD |
-| PROJECT_STATUS.md | ✅ Complete | MD |
-| Wiki (3 pages) | ✅ Complete | MD |
-
-### ✅ CI/CD & Distribution (100%)
-
-| Component | Status | Details |
-|-----------|--------|---------|
-| CI workflow | ✅ Complete | With Swift dependency caching |
-| Release workflow | ✅ Complete | Automated GitHub releases |
-| Sparkle appcast.xml | ✅ Complete | Configured for auto-updates |
-| Homebrew formula | ✅ Complete | dotweaver.rb |
-| Homebrew tap script | ✅ Complete | setup_homebrew_tap.sh |
-| Notarization config | ✅ Complete | ExportOptions.plist |
-| .gitignore | ✅ Complete | Comprehensive exclusions |
-| LICENSE | ✅ Complete | MIT License |
-
-### ✅ Processes Defined (100%)
-
-| Process | Status | Document |
-|---------|--------|----------|
-| Beta testing execution | ✅ Complete | BETA_TESTING_EXECUTION.md |
-| Security audit execution | ✅ Complete | SECURITY_AUDIT_EXECUTION.md |
-| Performance validation | ✅ Complete | PERFORMANCE_VALIDATION.md |
-| Final polish checklist | ✅ Complete | FINAL_POLISH_CHECKLIST.md |
-
----
-
-## Timeline to v1.0.0
-
-| Phase | Dates | Status |
-|-------|-------|--------|
-| **Beta Testing** | June 1-14, 2026 | ⏳ READY TO LAUNCH |
-| **Security Audit** | June 15-21, 2026 | ⏳ PREPARED |
-| **Performance Validation** | June 8-21, 2026 | ⏳ INFRASTRUCTURE READY |
-| **Final Polish** | June 15-19, 2026 | ⏳ CHECKLIST READY |
-| **v1.0.0 Release** | June 20, 2026 | 🎯 TARGET |
-
----
-
-## What's Left (Execution Phase Only)
-
-All code and documentation is complete. The remaining items are execution activities:
-
-1. **Beta Testing Execution** (June 1-14, 2026)
-   - Launch beta program
-   - Onboard 50-100 testers
-   - Collect and triage feedback
-   - Fix critical issues
-
-2. **Security Audit Execution** (June 15-21, 2026)
-   - Engage external security firm
-   - Conduct audit
-   - Remediate findings
-   - Obtain sign-off
-
-3. **Performance Validation** (June 8-21, 2026)
-   - Run performance tests with real users
-   - Analyze results
-   - Optimize as needed
-
-4. **Final Polish** (June 15-19, 2026)
-   - Address beta feedback
-   - UI/UX polish
-   - Documentation updates
-
-5. **v1.0.0 Release** (June 20, 2026)
-   - Create release
-   - Publish to GitHub
-   - Announce publicly
-
----
-
-## Project Metrics
-
-| Metric | Value |
-|--------|-------|
-| **Swift Files** | 32 |
-| **Documentation Files** | 27 (19 MD + 8 PDF) |
-| **Total Files** | 50+ |
-| **Lines of Code** | ~5,000+ |
-| **Test Coverage** | 85%+ target |
-| **Documentation Coverage** | 100% |
-| **AI References** | 0 (clean) |
-
----
-
-## Ready for Deployment
-
-**Download:** `DotWeaver_Final_Complete.zip`
-
-**Next Action:** 
-1. Unzip the package
-2. Open in Xcode: `swift build`
-3. Run tests: `swift test`
-4. Push to GitHub: `https://github.com/rausth/DotWeaver/`
-5. Launch beta: June 1, 2026
-6. Release v1.0.0: June 20, 2026
-
----
-
-**Document Version:** 1.0  
-**Last Updated:** May 28, 2026  
-**Status:** ✅ 100% COMPLETE - PRODUCTION READY
+Result: passing.

@@ -16,6 +16,8 @@ public final class DotfilesViewModel: ObservableObject {
     @Published public var gitBranch: String = "main" { didSet { save() } }
     @Published public var gitSshKeyPath: String = "~/.ssh/id_ed25519" { didSet { save() } }
     @Published public var gitHost: String = "GitHub" { didSet { save() } }
+    @Published public var providerTransportModes: [SyncProvider: ProviderTransportMode] = [:] { didSet { save() } }
+    @Published public var nativeProviderConfigs: [SyncProvider: NativeProviderConfig] = [:] { didSet { save() } }
 
     private let providers: [SyncProvider: SyncProviderProtocol]
     private var watchers: [String: FileWatcher] = [:]
@@ -50,7 +52,10 @@ public final class DotfilesViewModel: ObservableObject {
             gitRemoteUrl: gitRemoteUrl,
             gitBranch: gitBranch,
             gitSshKeyPath: gitSshKeyPath,
-            gitHost: gitHost
+            gitHost: gitHost,
+            providerTransportModes: providerTransportModes,
+            nativeProviderConfigs: nativeProviderConfigs,
+            securityScopedBookmarks: StateManager.loadState().securityScopedBookmarks
         )
         StateManager.saveState(state)
     }
@@ -67,6 +72,9 @@ public final class DotfilesViewModel: ObservableObject {
         self.gitBranch = state.gitBranch
         self.gitSshKeyPath = state.gitSshKeyPath
         self.gitHost = state.gitHost
+        self.providerTransportModes = state.providerTransportModes
+        self.nativeProviderConfigs = state.nativeProviderConfigs
+        SecurityScopedBookmarks.restoreAccess()
         
         // Add a log entry for startup if it's not a fresh state
         if !state.recentActivity.isEmpty {
@@ -86,10 +94,21 @@ public final class DotfilesViewModel: ObservableObject {
             return
         }
         
-        // Execute pre-sync hooks
+        if dotfiles.contains(where: \.isSecret), SecurityPolicy.requiresBiometricAuthentication {
+            do {
+                _ = try await BiometricAuthenticator.shared.authenticate(reason: "Authenticate to sync vaulted files")
+                addActivityLog(message: "Biometric authentication accepted for vaulted sync", type: .system)
+                SyncAuditLog.record("Biometric authentication accepted for vaulted sync")
+            } catch {
+                statusMessage = "❌ Authentication failed: \(error.localizedDescription)"
+                SyncAuditLog.record("Biometric authentication failed for vaulted sync")
+                return
+            }
+        }
+
         for dotfile in dotfiles {
             if let hook = dotfile.preSyncHook, !hook.isEmpty {
-                executeShellCommand(hook)
+                executeHook(hook, phase: "pre-sync", filePath: dotfile.path)
             }
         }
         
@@ -102,7 +121,7 @@ public final class DotfilesViewModel: ObservableObject {
             // Execute post-sync hooks
             for dotfile in self.dotfiles {
                 if let hook = dotfile.postSyncHook, !hook.isEmpty {
-                    executeShellCommand(hook)
+                    executeHook(hook, phase: "post-sync", filePath: dotfile.path)
                 }
             }
             
@@ -110,20 +129,29 @@ public final class DotfilesViewModel: ObservableObject {
             save()
         } catch {
             statusMessage = "❌ Sync failed: \(error.localizedDescription)"
+            SyncAuditLog.record("Sync failed", metadata: ["provider": selectedProvider.rawValue, "error": error.localizedDescription])
         }
     }
     
-    private func executeShellCommand(_ command: String) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        process.arguments = ["-c", command]
-        
-        let outputPipe = Pipe()
-        let errorPipe = Pipe()
-        process.standardOutput = outputPipe
-        process.standardError = errorPipe
-        
+    private func executeHook(_ command: String, phase: String, filePath: String) {
+        guard SecurityPolicy.hooksEnabled else {
+            addActivityLog(message: "Skipped disabled \(phase) hook for \((filePath as NSString).lastPathComponent)", type: .system)
+            SyncAuditLog.record("Skipped disabled hook", metadata: ["phase": phase, "file": filePath])
+            return
+        }
+
         do {
+            let hookURL = try validatedHookScript(command)
+            SyncAuditLog.record("Executing hook", metadata: ["phase": phase, "file": filePath, "hook": hookURL.path])
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+            process.arguments = [hookURL.path, filePath, phase]
+
+            let outputPipe = Pipe()
+            let errorPipe = Pipe()
+            process.standardOutput = outputPipe
+            process.standardError = errorPipe
+
             try process.run()
             process.waitUntilExit()
             
@@ -131,11 +159,30 @@ public final class DotfilesViewModel: ObservableObject {
                 let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
                 if let errorMessage = String(data: errorData, encoding: .utf8) {
                     print("Hook error: \(errorMessage)")
+                    SyncAuditLog.record("Hook failed", metadata: ["phase": phase, "file": filePath, "error": errorMessage])
                 }
+            } else {
+                SyncAuditLog.record("Hook completed", metadata: ["phase": phase, "file": filePath])
             }
         } catch {
             print("Failed to run hook: \(error.localizedDescription)")
+            SyncAuditLog.record("Hook launch failed", metadata: ["phase": phase, "file": filePath, "error": error.localizedDescription])
         }
+    }
+
+    private func validatedHookScript(_ rawPath: String) throws -> URL {
+        let hookRoot = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".dotweaver/hooks", isDirectory: true)
+            .standardizedFileURL
+        let hookURL = URL(fileURLWithPath: (rawPath as NSString).expandingTildeInPath).standardizedFileURL
+        try SyncPathSecurity.validateLocalFile(hookURL)
+        try SyncPathSecurity.ensureContained(hookURL, in: hookRoot)
+
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: hookURL.path, isDirectory: &isDirectory), !isDirectory.boolValue else {
+            throw SyncError.fileNotFound(hookURL.path)
+        }
+        return hookURL
     }
     
     public func startWatchingDotfiles() {
@@ -173,12 +220,29 @@ public final class DotfilesViewModel: ObservableObject {
         }
         // Save is handled by didSet
     }
+
+    public func transportMode(for provider: SyncProvider) -> ProviderTransportMode {
+        providerTransportModes[provider] ?? .folder
+    }
+
+    public func setTransportMode(_ mode: ProviderTransportMode, for provider: SyncProvider) {
+        providerTransportModes[provider] = mode
+    }
+
+    public func nativeConfig(for provider: SyncProvider) -> NativeProviderConfig {
+        nativeProviderConfigs[provider] ?? NativeProviderConfig()
+    }
+
+    public func setNativeConfig(_ config: NativeProviderConfig, for provider: SyncProvider) {
+        nativeProviderConfigs[provider] = config
+    }
     
     public func toggleSecret(for file: Dotfile) {
         if let index = dotfiles.firstIndex(where: { $0.id == file.id }) {
             dotfiles[index].isSecret.toggle()
             let status = dotfiles[index].isSecret ? "vaulted" : "unvaulted"
             addActivityLog(message: "File \((file.path as NSString).lastPathComponent) \(status)", type: .system)
+            SyncAuditLog.record("Toggled vault status", metadata: ["file": file.path, "status": status])
             // Save is handled by didSet
         }
     }

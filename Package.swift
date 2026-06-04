@@ -8,6 +8,9 @@ let package = Package(
         .executable(name: "DotWeaverApp", targets: ["DotWeaver"]),
         .executable(name: "dw", targets: ["DotWeaverCLI"])
     ],
+    dependencies: [
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.9.1")
+    ],
     targets: [
         .target(
             name: "DotWeaverKit",
@@ -16,7 +19,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "DotWeaver",
-            dependencies: ["DotWeaverKit"],
+            dependencies: [
+                "DotWeaverKit",
+                .product(name: "Sparkle", package: "Sparkle")
+            ],
             resources: [
                 .copy("LICENSE")
             ]

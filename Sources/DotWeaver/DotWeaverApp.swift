@@ -4,6 +4,7 @@ import DotWeaverKit
 @main
 struct DotWeaver: App {
     @StateObject private var viewModel = DotfilesViewModel()
+    @StateObject private var updateManager = UpdateManager.shared
     @Environment(\.openWindow) private var openWindow
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     
@@ -59,6 +60,11 @@ struct DotWeaver: App {
                 openWindow(id: "main")
                 NSApp.activate(ignoringOtherApps: true)
             }
+
+            Button("Check for Updates...") {
+                updateManager.checkForUpdates()
+            }
+            .disabled(!updateManager.canCheckForUpdates)
             
             #if os(macOS)
             Button("Settings...") {

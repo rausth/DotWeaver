@@ -2,6 +2,13 @@
 .build/
 dist/
 Archive.zip
+*.zip
+*.tar.gz
+*.p12
+*.mobileprovision
+*.xcarchive
+*sparkle*private*key*
+*Sparkle*Private*Key*
 *.dSYM
 DerivedData/
 Packages/

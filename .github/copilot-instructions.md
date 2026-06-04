@@ -91,5 +91,5 @@ New sync-related behavior should keep this end-to-end state transition pattern.
 ### Tests use provider injection instead of real network providers
 
 - `DotfilesViewModel` has an initializer taking a provider map for tests.
-- `Tests/DotWeaverKitTests/MockSyncProvider.swift` is the test double used to simulate delay/failure and deterministic sync outcomes.
-- Keep unit/integration tests focused on model/viewmodel/protocol behavior rather than external service calls.
+- Current tests use temporary local provider roots, temporary Git remotes, and injected provider maps instead of external service calls.
+- Keep unit/integration tests focused on model/viewmodel/protocol behavior; validate real cloud accounts only in manual release testing.

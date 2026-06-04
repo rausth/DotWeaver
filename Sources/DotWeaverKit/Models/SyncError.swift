@@ -6,6 +6,8 @@ enum SyncError: LocalizedError {
     case networkError(String)
     case conflictDetected([Dotfile])
     case fileNotFound(String)
+    case invalidPath(String)
+    case encryptionFailed(String)
     
     var errorDescription: String? {
         switch self {
@@ -19,6 +21,10 @@ enum SyncError: LocalizedError {
             return "Conflict detected in \(files.count) files"
         case .fileNotFound(let path):
             return "File not found: \(path)"
+        case .invalidPath(let message):
+            return "Invalid path: \(message)"
+        case .encryptionFailed(let message):
+            return "Encryption failed: \(message)"
         }
     }
 }

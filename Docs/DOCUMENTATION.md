@@ -1,8 +1,8 @@
 # DotWeaver - Documentation Index
 
 **Version:** 1.0  
-**Last Updated:** May 28, 2026  
-**Status:** 100% COMPLETE - All features implemented
+**Last Updated:** June 3, 2026
+**Status:** Current implementation documented
 
 Welcome to the DotWeaver documentation! This index provides an overview of all available documentation for developers, contributors, and users.
 
@@ -34,7 +34,6 @@ Welcome to the DotWeaver documentation! This index provides an overview of all a
 |----------|-------------|
 | [Release Process](wiki/Release-Process) | How to cut a new release |
 | [CI/CD Pipeline](.github/workflows/) | GitHub Actions workflow documentation |
-| [Homebrew Formula](Formula/dotweaver.rb) | Homebrew tap configuration |
 | [Notarization Guide](wiki/Notarization) | macOS notarization and Sparkle setup |
 | [Next Steps](NEXT_STEPS.md) | What's left and post-release roadmap |
 
@@ -63,24 +62,23 @@ Dotfiles are configuration files that start with a dot (`.`) and control the beh
 
 ### Synchronization
 DotWeaver supports two synchronization modes:
-- **Pull**: Download remote changes to local machine
-- **Push**: Upload local changes to remote storage
-- **Bidirectional**: Two-way sync with automatic conflict detection
+- **Bidirectional folder sync**: Copy newer local or stored files between the home directory and `<provider folder>/.dotweaver/files/`
+- **Git push/pull**: Use the configured local repository, remote URL, and branch
 
 ### Providers
 A "provider" is a storage backend that hosts your dotfiles. DotWeaver supports:
-- **Version Control**: Git (local or remote)
-- **Cloud Storage**: iCloud, OneDrive, Google Drive, Dropbox
-- **Self-Hosted**: WebDAV, SFTP, FTPS
-- **Object Storage**: Amazon S3
+- **Version Control**: Git local repository, with push/pull through the system `git`
+- **Desktop-client folders**: iCloud, OneDrive, Google Drive, Dropbox
+- **Mounted folders**: WebDAV, SFTP, FTPS, Amazon S3 through Finder, rclone, sshfs, s3fs, or equivalent
+- **Native Protocol endpoints**: WebDAV, SFTP, FTPS, Amazon S3-compatible endpoints through system `curl`
 
 ### Security Model
 DotWeaver prioritizes security through:
 1. **Credential Isolation**: All passwords stored in macOS Keychain
 2. **Biometric Protection**: Touch ID / Face ID required for sensitive operations
-3. **Hardware Security**: Optional Secure Enclave key for signing
-4. **Sandboxing**: App runs in macOS App Sandbox with minimal permissions
-5. **Encrypted Transit**: All network traffic uses TLS/SSH
+3. **Vault Key Protection**: Vault master key stored in macOS Keychain
+4. **Sandboxing**: App runs in macOS App Sandbox and persists access to GUI-selected resources with security-scoped bookmarks
+5. **External Remote Auth**: Folder-backed remote providers rely on the selected desktop client or mount tool for transport security
 
 ---
 
@@ -122,5 +120,5 @@ All documentation is licensed under [Creative Commons Attribution 4.0 Internatio
 ---
 
 **Maintained by:** The DotWeaver Team  
-**Last Updated:** May 28, 2026  
-**Status:** 100% COMPLETE - All features implemented
+**Last Updated:** June 3, 2026
+**Status:** Current implementation documented

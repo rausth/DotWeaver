@@ -113,14 +113,6 @@ struct ContentView: View {
         }
         .preferredColorScheme(.dark)
         .onAppear {
-            if viewModel.dotfiles.isEmpty {
-                viewModel.dotfiles = [
-                    Dotfile(path: "~/.zshrc", status: .synced, isMonitored: true, group: "Shell"),
-                    Dotfile(path: "~/.gitconfig", status: .modified, isMonitored: true, group: "Git"),
-                    Dotfile(path: "~/.config/starship.toml", status: .synced, isMonitored: false, group: "Appearance"),
-                    Dotfile(path: "~/.vimrc", status: .error, isMonitored: true, group: "Editors")
-                ]
-            }
             viewModel.startWatchingDotfiles()
         }
     }
@@ -166,6 +158,7 @@ struct SidebarButton: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("sidebar.\(String(describing: item))")
         .onHover { hovering in isHovered = hovering }
     }
 }
@@ -242,6 +235,7 @@ struct DashboardView: View {
                     .clipShape(Capsule())
                     .shadow(color: Color.blue.opacity(0.4), radius: 12, x: 0, y: 6)
                     .disabled(viewModel.isSyncing)
+                    .accessibilityIdentifier("dashboard.syncNow")
                 }
                 
                 // Cards
@@ -482,6 +476,7 @@ struct MonitoredFilesView: View {
                 .foregroundColor(.white)
                 .clipShape(Capsule())
                 .shadow(color: .blue.opacity(0.4), radius: 10, x: 0, y: 5)
+                .accessibilityIdentifier("files.addFile")
             }
             .padding(40)
             
@@ -490,6 +485,7 @@ struct MonitoredFilesView: View {
             HStack {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                 TextField("Search files...", text: $searchText).textFieldStyle(.plain)
+                    .accessibilityIdentifier("files.search")
             }
             .padding(16)
             .background(Color.black.opacity(0.2)).background(.ultraThinMaterial)
@@ -542,13 +538,8 @@ struct MonitoredFilesView: View {
             panel.beginSheetModal(for: window) { response in
                 if response == .OK {
                     for url in panel.urls {
-                        let newFile = Dotfile(path: url.path, status: .synced, conflictStrategy: .lastModifiedWins, isMonitored: true)
                         DispatchQueue.main.async {
-                            if !viewModel.dotfiles.contains(where: { $0.path == url.path }) {
-                                viewModel.dotfiles.append(newFile)
-                                viewModel.addActivityLog(message: "Added \((url.path as NSString).lastPathComponent) to monitoring", type: .add)
-                                viewModel.save()
-                            }
+                            monitor(url)
                         }
                     }
                 }
@@ -557,16 +548,26 @@ struct MonitoredFilesView: View {
             NSApp.activate(ignoringOtherApps: true)
             if panel.runModal() == .OK {
                 for url in panel.urls {
-                    let newFile = Dotfile(path: url.path, status: .synced, conflictStrategy: .lastModifiedWins, isMonitored: true)
-                    if !viewModel.dotfiles.contains(where: { $0.path == url.path }) {
-                        viewModel.dotfiles.append(newFile)
-                        viewModel.addActivityLog(message: "Added \((url.path as NSString).lastPathComponent) to monitoring", type: .add)
-                        viewModel.save()
-                    }
+                    monitor(url)
                 }
             }
         }
         #endif
+    }
+
+    private func monitor(_ url: URL) {
+        do {
+            try SyncPathSecurity.validateLocalFile(url)
+            try SecurityScopedBookmarks.register(url)
+            let newFile = Dotfile(path: url.path, status: .synced, conflictStrategy: .lastModifiedWins, isMonitored: true)
+            if !viewModel.dotfiles.contains(where: { $0.path == url.path }) {
+                viewModel.dotfiles.append(newFile)
+                viewModel.addActivityLog(message: "Added \((url.path as NSString).lastPathComponent) to monitoring", type: .add)
+                viewModel.save()
+            }
+        } catch {
+            viewModel.statusMessage = "Cannot monitor \(url.lastPathComponent): \(error.localizedDescription)"
+        }
     }
 }
 
@@ -601,17 +602,18 @@ struct FileRowGlass: View {
                 
                 Button(action: { path.append(file.path) }) {
                     Image(systemName: "square.and.pencil").foregroundStyle(.primary).padding(10).background(Color.white.opacity(isHovering ? 0.12 : 0.06)).cornerRadius(8)
-                }.buttonStyle(.plain).help("Edit File")
+                }.buttonStyle(.plain).help("Edit File").accessibilityIdentifier("files.edit.\(file.id.uuidString)")
 
                 Button(role: .destructive, action: { withAnimation { viewModel.removeFile(id: file.id) } }) {
                     Image(systemName: "trash").foregroundStyle(.red).padding(10).background(Color.red.opacity(isHovering ? 0.12 : 0.06)).cornerRadius(8)
-                }.buttonStyle(.plain).help("Stop Monitoring")
+                }.buttonStyle(.plain).help("Stop Monitoring").accessibilityIdentifier("files.remove.\(file.id.uuidString)")
             }.opacity(isHovering ? 1 : 0)
         }
         .padding(.vertical, 14).padding(.horizontal, 20)
         .background(Color(white: 0.1).opacity(0.4)).background(.ultraThinMaterial)
         .cornerRadius(16)
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.08), lineWidth: 1))
+        .accessibilityIdentifier("files.row.\(file.id.uuidString)")
         .onHover { hovering in withAnimation(.easeInOut(duration: 0.15)) { isHovering = hovering } }
     }
     
@@ -678,6 +680,7 @@ struct ProvidersView: View {
             }
             .padding(40)
         }
+        .accessibilityIdentifier("providers.view")
     }
     
     private func selectProvider(_ provider: SyncProvider) {
@@ -685,7 +688,7 @@ struct ProvidersView: View {
             viewModel.selectedProvider = provider
         }
         
-        if provider == .icloud || provider == .dropbox || provider == .googledrive || provider == .onedrive {
+        if provider != .git {
             #if os(macOS)
             let panel = NSOpenPanel()
             panel.canChooseFiles = false
@@ -715,6 +718,8 @@ struct ProvidersView: View {
                 if let icloudUrl = fm.url(forUbiquityContainerIdentifier: nil)?.appendingPathComponent("Documents") {
                     defaultUrl = icloudUrl
                 }
+            case .webdav, .sftp, .ftps, .s3:
+                defaultUrl = home
             default:
                 break
             }
@@ -725,6 +730,7 @@ struct ProvidersView: View {
                 panel.beginSheetModal(for: window) { response in
                     if response == .OK, let url = panel.url {
                         DispatchQueue.main.async {
+                            try? SecurityScopedBookmarks.register(url)
                             viewModel.cloudSyncPath = url.path
                             viewModel.statusMessage = "\(provider.title) folder linked successfully!"
                             viewModel.save()
@@ -734,6 +740,7 @@ struct ProvidersView: View {
             } else {
                 NSApp.activate(ignoringOtherApps: true)
                 if panel.runModal() == .OK, let url = panel.url {
+                    try? SecurityScopedBookmarks.register(url)
                     viewModel.cloudSyncPath = url.path
                     viewModel.statusMessage = "\(provider.title) folder linked successfully!"
                     viewModel.save()
@@ -774,6 +781,7 @@ struct ProviderCard: View {
             .scaleEffect(isHovered && !isSelected ? 1.02 : 1.0)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("providers.card.\(provider.rawValue)")
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.2)) {
                 isHovered = hovering

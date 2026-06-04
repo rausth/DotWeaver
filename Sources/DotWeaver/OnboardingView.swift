@@ -195,6 +195,7 @@ struct OnboardingProviderCard: View {
             panel.prompt = "Select Sync Folder"
             
             if panel.runModal() == .OK, let url = panel.url {
+                try? SecurityScopedBookmarks.register(url)
                 viewModel.cloudSyncPath = url.path
             }
         }

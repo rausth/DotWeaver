@@ -17,3 +17,9 @@ jobs:
         
       - name: Build and Test
         run: swift test
+
+      - name: Validate scripts
+        run: bash -n script/*.sh
+
+      - name: Provider matrix smoke
+        run: script/smoke_provider_matrix.sh

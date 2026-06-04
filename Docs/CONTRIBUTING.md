@@ -42,7 +42,6 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 - macOS 15.0 or later
 - Xcode 16.0 or later
 - Swift 6.0 or later
-- Homebrew (for dependency management)
 
 ### Building from Source
 

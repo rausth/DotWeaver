@@ -4,46 +4,69 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 jobs:
-  build-and-release:
+  release:
     runs-on: macos-15
     permissions:
       contents: write
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      NOTARIZE: "1"
+      PRODUCT_BUNDLE_IDENTIFIER: com.rausth.DotWeaver
+      SPARKLE_FEED_URL: https://github.com/rausth/DotWeaver/releases/latest/download/appcast.xml
+      SPARKLE_PUBLIC_ED_KEY: ${{ secrets.SPARKLE_PUBLIC_ED_KEY }}
+      DEVELOPER_ID_APPLICATION: ${{ secrets.DEVELOPER_ID_APPLICATION }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_16.0.app
-        
-      - name: Build Apple Silicon
-        run: swift build -c release --arch arm64
-        
-      - name: Build Intel
-        run: swift build -c release --arch x86_64
-        
-      - name: Create Release Package
+
+      - name: Import Developer ID certificate
+        env:
+          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
         run: |
-          mkdir -p package/AppleSilicon package/Intel
-          cp .build/arm64-apple-macosx/release/DotWeaverApp package/AppleSilicon/
-          cp .build/x86_64-apple-macosx/release/DotWeaverApp package/Intel/
-          tar -czf DotWeaver-macOS.tar.gz package/
-          
-      - name: Create Release
+          set -euo pipefail
+          security create-keychain -p "$RUNNER_TEMP" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$RUNNER_TEMP" build.keychain
+          echo "$MACOS_CERTIFICATE_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/developer-id.p12"
+          security import "$RUNNER_TEMP/developer-id.p12" -k build.keychain -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$RUNNER_TEMP" build.keychain
+
+      - name: Test
+        run: swift test
+
+      - name: Package, sign, notarize, and staple
+        run: script/package_release.sh
+
+      - name: Generate appcast
+        env:
+          DOWNLOAD_BASE_URL: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}
+          REQUIRE_SPARKLE_SIGNATURE: "1"
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: script/generate_appcast.sh
+
+      - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: DotWeaver-macOS.tar.gz
-          body_path: CHANGELOG.md
+          files: |
+            dist/artifacts/DotWeaver-*-macOS-universal.zip
+            dist/artifacts/dw-*-macOS-universal.tar.gz
+            dist/artifacts/SHA256SUMS.txt
+            appcast.xml
+          body_path: Docs/CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: Trigger Homebrew Tap Update
-        run: |
-          curl -X POST \
-            -H "Accept: application/vnd.github.v3+json" \
-            -H "Authorization: token ${{ secrets.RELEASE_TOKEN }}" \
-            https://api.github.com/repos/${{ github.repository_owner }}/homebrew-dotweaver/dispatches \
-            -d '{"event_type":"new-release"}'
-        continue-on-error: true
+
+      - name: Validate hosted Sparkle assets
+        env:
+          APPCAST_URL: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/appcast.xml
+          REQUIRE_SPARKLE_SIGNATURE: "1"
+        run: script/validate_hosted_sparkle.sh

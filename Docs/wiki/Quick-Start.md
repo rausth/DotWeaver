@@ -4,14 +4,7 @@ Get up and running with DotWeaver in under 5 minutes.
 
 ## Installation
 
-### Option 1: Homebrew (Recommended)
-
-```bash
-brew tap rausth/dotweaver
-brew install dotweaver
-```
-
-### Option 2: Direct Download
+### Direct Download
 
 1. Download the latest release from [GitHub Releases](https://github.com/rausth/DotWeaver/releases)
 2. Open `DotWeaver.app` and follow the onboarding wizard
@@ -19,21 +12,18 @@ brew install dotweaver
 ## Initial Setup
 
 1. **Launch DotWeaver** - The app will guide you through initial setup
-2. **Grant Permissions** - Allow Home Folder access when prompted
+2. **Grant Permissions** - Select folders/files through DotWeaver so macOS grants access
 3. **Choose a Provider** - Select where to store your dotfiles (Git recommended for beginners)
-4. **Initialize** - Create your first dotfile repository
+4. **Add Files** - Add your first monitored dotfile
 
 ## Your First Sync
 
 ```bash
-# Initialize a new dotfile repository
-dotweaver init
-
 # Add your first dotfile
-dotweaver add ~/.zshrc
+dw add ~/.zshrc
 
 # Sync with your chosen provider
-dotweaver sync
+dw sync
 ```
 
 ## Next Steps
@@ -45,6 +35,6 @@ dotweaver sync
 
 ## Getting Help
 
-- Run `dotweaver --help` for command documentation
+- Run `dw --help` for command documentation
 - Visit our [GitHub Discussions](https://github.com/rausth/DotWeaver/discussions)
 - Check [Troubleshooting](Troubleshooting) for common issues

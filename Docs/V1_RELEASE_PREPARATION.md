@@ -15,7 +15,6 @@
 - [ ] Create demo video (optional)
 
 ### June 16: Distribution Testing
-- [ ] Test Homebrew installation
 - [ ] Test manual installation
 - [ ] Verify Sparkle auto-update
 - [ ] Test notarization
@@ -32,7 +31,7 @@
 - [ ] Full regression test
 - [ ] Performance validation
 - [ ] Security spot-check
-- [ ] Beta feedback integration
+- [ ] Run scripted app launch smoke (`script/smoke_app_ui.sh`)
 - [ ] Crash rate verification (< 1%)
 
 ### June 19: Release Preparation
@@ -60,7 +59,6 @@ git push origin v1.0.0
 #    - Builds release binaries
 #    - Creates GitHub release
 #    - Uploads artifacts
-#    - Triggers Homebrew tap update
 ```
 
 **10:00 AM - Verify Release:**
@@ -68,7 +66,6 @@ git push origin v1.0.0
 # 1. Check GitHub release page
 # 2. Verify all artifacts uploaded
 # 3. Test download links
-# 4. Verify Homebrew tap updated
 ```
 
 **11:00 AM - Update Documentation:**
@@ -92,7 +89,7 @@ git push origin v1.0.0
 
 **2:00 PM - Community Engagement:**
 ```bash
-# 1. Thank beta testers publicly
+# 1. Thank early testers publicly
 # 2. Respond to initial feedback
 # 3. Monitor GitHub issues
 # 4. Engage with community
@@ -109,7 +106,7 @@ git push origin v1.0.0
 **4:00 PM - Post-Release Tasks:**
 ```bash
 # 1. Update project website
-# 2. Send email to beta testers
+# 2. Send email to early testers
 # 3. Update documentation
 # 4. Prepare v1.0.1 roadmap
 ```
@@ -130,15 +127,9 @@ git push origin v1.0.0
 - [ ] Release tag: v1.0.0
 - [ ] Release title: "DotWeaver v1.0.0 - Initial Release"
 - [ ] Release notes: Full changelog + highlights
-- [ ] Binaries: DotWeaver-macOS.tar.gz
-- [ ] Checksums: SHA256 hashes
+- [ ] Binaries: DotWeaver-1.0.0-macOS-universal.zip and dw-1.0.0-macOS-universal.tar.gz
+- [ ] Checksums: SHA256SUMS.txt
 - [ ] Links: Documentation, issues, discussions
-
-### Homebrew
-- [ ] Formula updated with correct SHA256
-- [ ] Tap repository updated
-- [ ] Installation instructions verified
-- [ ] Test installation on clean system
 
 ### Sparkle
 - [ ] appcast.xml updated with v1.0.0
@@ -186,8 +177,7 @@ git push origin v1.0.0
 | Metric | Target | Measurement |
 |--------|--------|-------------|
 | GitHub Stars | 100+ | GitHub |
-| Downloads | 500+ | GitHub + Homebrew |
-| Homebrew Installs | 100+ | Homebrew analytics |
+| Downloads | 500+ | GitHub |
 | Crash Rate | < 5% | Crashlytics |
 | User Satisfaction | 4+ / 5 | Survey |
 | NPS Score | 7+ / 10 | Survey |

@@ -10,18 +10,18 @@
 
 DotWeaver has been designed with security as a core principle. The application follows defense-in-depth principles with multiple layers of protection.
 
-**Overall Security Rating: A- (Excellent)**
+**Overall Security Rating: Preliminary Review**
 
 ### Strengths
 - ✅ Proper use of macOS Keychain for credential storage
 - ✅ Biometric authentication integration
 - ✅ App Sandbox with minimal permissions
 - ✅ No telemetry or data collection
-- ✅ Certificate pinning for network security
-- ✅ Secure Enclave support for sensitive operations
+- ✅ Keychain-protected vault master key
+- ✅ Remote-provider transport delegated to external clients or mount tools
 
 ### Areas for Improvement
-- ⚠️ Add certificate pinning for all HTTP providers (currently only GitHub)
+- ⚠️ Validate external sync or mount tool assumptions for folder-backed providers
 - ⚠️ Implement rate limiting for authentication attempts
 - ⚠️ Add audit logging for security events
 
@@ -33,31 +33,32 @@ DotWeaver has been designed with security as a core principle. The application f
 
 **Implementation:**
 - All credentials stored in macOS Keychain
-- Uses `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`
-- Keychain Access Groups properly configured
+- Uses `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`
+- Keychain items are device-local and scoped to DotWeaver services
 - Biometric protection via `LAContext`
 
 **Recommendations:**
 - Consider adding keychain item access control lists (ACLs)
 - Implement keychain item rotation after 90 days
 
-### 2. Network Security ✅ GOOD
+### 2. Provider Transport ⚠️ EXTERNAL DEPENDENCY
 
 **Implementation:**
-- TLS 1.3 enforcement
-- 30-second connection timeout
-- Exponential backoff for retries
+- Git network operations use the system `git` binary.
+- Cloud and remote-style providers use selected local folders.
+- Remote transport is handled by desktop sync clients or mount tools.
 
 **Recommendations:**
-- Add certificate pinning for all providers (currently only partial)
-- Implement certificate transparency verification
-- Add network request signing for API calls
+- Document supported mount tools and expected security settings.
+- Add native protocol clients only with explicit credential and TLS/SSH validation.
+- Add integration tests for provider folders backed by common sync clients.
 
 ### 3. Application Security ✅ EXCELLENT
 
 **Implementation:**
 - App Sandbox enabled
 - Home Folder Access only (no Full Disk Access)
+- Security-scoped bookmarks persisted for GUI-selected files and provider folders
 - No unnecessary entitlements
 - Proper code signing configuration
 
@@ -83,7 +84,7 @@ DotWeaver has been designed with security as a core principle. The application f
 **Implementation:**
 - Touch ID / Face ID integration
 - Passcode fallback
-- Secure Enclave optional key
+- Keychain-protected vault master key
 - Rate limiting considerations
 
 **Recommendations:**

@@ -1,11 +1,15 @@
 import Foundation
 import LocalAuthentication
 
-actor BiometricAuthenticator {
-    static let shared = BiometricAuthenticator()
+public actor BiometricAuthenticator {
+    public static let shared = BiometricAuthenticator()
     private init() {}
     
-    func authenticate(reason: String = "Authenticate to access credentials", allowFallback: Bool = true) async throws -> Bool {
+    public func authenticate(reason: String = "Authenticate to access credentials", allowFallback: Bool = true) async throws -> Bool {
+        if SecurityPolicy.isRunningTests {
+            throw BiometricError.notAvailable
+        }
+
         let context = LAContext()
         let policy: LAPolicy = allowFallback ? .deviceOwnerAuthentication : .deviceOwnerAuthenticationWithBiometrics
         
@@ -18,11 +22,11 @@ actor BiometricAuthenticator {
     }
 }
 
-enum BiometricError: LocalizedError {
+public enum BiometricError: LocalizedError {
     case notAvailable
     case authenticationFailed
     
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .notAvailable: return "Biometric authentication is not available on this device."
         case .authenticationFailed: return "Authentication was canceled or failed."

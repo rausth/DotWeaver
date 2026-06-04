@@ -5,7 +5,13 @@ struct ConflictResolutionView: View {
     let conflictedFiles: [Dotfile]
     @State private var selectedFile: Dotfile?
     @State private var resolution: ConflictStrategy = .lastModifiedWins
+    @State private var resolvedFileIDs: Set<UUID> = []
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var viewModel: DotfilesViewModel
+
+    private var unresolvedFiles: [Dotfile] {
+        conflictedFiles.filter { !resolvedFileIDs.contains($0.id) }
+    }
     
     var body: some View {
         NavigationStack {
@@ -23,7 +29,7 @@ struct ConflictResolutionView: View {
                         Text("Conflict Resolution")
                             .font(.title2)
                             .fontWeight(.bold)
-                        Text("\(conflictedFiles.count) file(s) require your attention before syncing can continue.")
+                        Text("\(unresolvedFiles.count) file(s) require your attention before syncing can continue.")
                             .foregroundStyle(.secondary)
                             .font(.subheadline)
                     }
@@ -37,7 +43,7 @@ struct ConflictResolutionView: View {
                 // Main Content
                 HStack(spacing: 0) {
                     // List
-                    List(conflictedFiles, selection: $selectedFile) { file in
+                    List(unresolvedFiles, selection: $selectedFile) { file in
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text((file.path as NSString).lastPathComponent)
@@ -82,12 +88,12 @@ struct ConflictResolutionView: View {
                             // Diff Viewer Content
                             GeometryReader { geometry in
                                 HStack(spacing: 0) {
-                                    DiffPanel(title: "Local Version", content: getMockLocalContent(for: file), color: .blue)
+                                    DiffPanel(title: "Local Version", content: localContent(for: file), color: .blue)
                                         .frame(width: geometry.size.width / 2)
                                     
                                     Divider().opacity(0.5)
                                     
-                                    DiffPanel(title: "Cloud Version", content: getMockRemoteContent(for: file), color: .purple)
+                                    DiffPanel(title: "Stored Version", content: storedContent(for: file), color: .purple)
                                         .frame(width: geometry.size.width / 2)
                                 }
                             }
@@ -131,29 +137,113 @@ struct ConflictResolutionView: View {
     }
     
     private func applyResolution(for file: Dotfile) {
-        print("Applying \(resolution) to \(file.path)")
-        selectedFile = nil
-        if conflictedFiles.isEmpty { dismiss() }
+        do {
+            try resolve(file: file)
+            resolvedFileIDs.insert(file.id)
+            selectedFile = unresolvedFiles.first
+            viewModel.statusMessage = "Conflict resolved for \((file.path as NSString).lastPathComponent)"
+
+            if unresolvedFiles.isEmpty {
+                dismiss()
+            }
+        } catch {
+            viewModel.statusMessage = "Conflict resolution failed: \(error.localizedDescription)"
+        }
     }
-    
-    // Mocks for visual demonstration since full provider diff logic isn't wired yet
-    private func getMockLocalContent(for file: Dotfile) -> String {
-        return """
-        # Local changes
-        export PATH="/usr/local/bin:$PATH"
-        alias gs="git status"
-        alias ga="git add ."
-        alias gc="git commit -m"
-        """
+
+    private func resolve(file: Dotfile) throws {
+        let localURL = localURL(for: file)
+        let storedURL = try storedURL(for: file)
+
+        switch resolution {
+        case .localWins:
+            try writeStoredFile(from: localURL, to: storedURL, file: file)
+        case .remoteWins:
+            try restoreStoredFile(from: storedURL, to: localURL)
+        case .lastModifiedWins:
+            let localDate = modificationDate(at: localURL) ?? .distantPast
+            let storedDate = modificationDate(at: storedURL) ?? .distantPast
+            if localDate >= storedDate {
+                try writeStoredFile(from: localURL, to: storedURL, file: file)
+            } else {
+                try restoreStoredFile(from: storedURL, to: localURL)
+            }
+        case .manual:
+            throw NSError(
+                domain: "DotWeaver.ConflictResolution",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Select a concrete resolution strategy before applying."]
+            )
+        }
     }
-    
-    private func getMockRemoteContent(for file: Dotfile) -> String {
-        return """
-        # Remote changes from another Mac
-        export PATH="/opt/homebrew/bin:$PATH"
-        alias gs="git status"
-        alias gd="git diff"
-        """
+
+    private func localContent(for file: Dotfile) -> String {
+        readText(at: localURL(for: file))
+    }
+
+    private func storedContent(for file: Dotfile) -> String {
+        do {
+            return readText(at: try storedURL(for: file))
+        } catch {
+            return "Stored version unavailable: \(error.localizedDescription)"
+        }
+    }
+
+    private func localURL(for file: Dotfile) -> URL {
+        URL(fileURLWithPath: (file.path as NSString).expandingTildeInPath)
+    }
+
+    private func storedURL(for file: Dotfile) throws -> URL {
+        let rootPath = storageRootPath().trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rootPath.isEmpty else {
+            throw NSError(
+                domain: "DotWeaver.ConflictResolution",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Storage folder is not configured."]
+            )
+        }
+
+        return SyncStoragePaths.remoteFileURL(
+            forLocalFile: localURL(for: file),
+            storageRoot: URL(fileURLWithPath: (rootPath as NSString).expandingTildeInPath)
+        )
+    }
+
+    private func storageRootPath() -> String {
+        viewModel.selectedProvider == .git ? viewModel.gitLocalPath : viewModel.cloudSyncPath
+    }
+
+    private func readText(at url: URL) -> String {
+        do {
+            let data = try VaultCrypto.decryptIfNeeded(Data(contentsOf: url))
+            return String(data: data, encoding: .utf8) ?? "<binary file>"
+        } catch {
+            return "Unable to read \(url.path): \(error.localizedDescription)"
+        }
+    }
+
+    private func writeStoredFile(from source: URL, to destination: URL, file: Dotfile) throws {
+        let data = try Data(contentsOf: source)
+        let storedData = file.isSecret ? try VaultCrypto.encrypt(data, originalPath: file.path) : data
+        try writeStoredData(storedData, to: destination)
+    }
+
+    private func restoreStoredFile(from source: URL, to destination: URL) throws {
+        let data = try VaultCrypto.decryptIfNeeded(Data(contentsOf: source))
+        try SyncPathSecurity.writeFileAtomically(data, to: destination)
+    }
+
+    private func writeStoredData(_ data: Data, to destination: URL) throws {
+        let fm = FileManager.default
+        try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if fm.fileExists(atPath: destination.path) {
+            try fm.removeItem(at: destination)
+        }
+        try data.write(to: destination, options: .atomic)
+    }
+
+    private func modificationDate(at url: URL) -> Date? {
+        try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date
     }
 }
 

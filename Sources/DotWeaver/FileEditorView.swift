@@ -78,9 +78,9 @@ struct FileEditorView: View {
                             }
 
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Pre-sync Hook")
+                                Text("Pre-sync Hook Script")
                                     .font(.caption)
-                                TextField("Shell command to run BEFORE sync", text: Binding(
+                                TextField("Path under ~/.dotweaver/hooks", text: Binding(
                                     get: { viewModel.dotfiles[index].preSyncHook ?? "" },
                                     set: { viewModel.dotfiles[index].preSyncHook = $0.isEmpty ? nil : $0 }
                                 ))
@@ -88,9 +88,9 @@ struct FileEditorView: View {
                             }
 
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Post-sync Hook")
+                                Text("Post-sync Hook Script")
                                     .font(.caption)
-                                TextField("Shell command to run AFTER sync", text: Binding(
+                                TextField("Path under ~/.dotweaver/hooks", text: Binding(
                                     get: { viewModel.dotfiles[index].postSyncHook ?? "" },
                                     set: { viewModel.dotfiles[index].postSyncHook = $0.isEmpty ? nil : $0 }
                                 ))
@@ -135,22 +135,26 @@ struct FileEditorView: View {
     }
     
     private func loadFile(path: String) {
-        let expandedPath = (path as NSString).expandingTildeInPath
+        let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
         do {
-            content = try String(contentsOfFile: expandedPath, encoding: .utf8)
+            try SyncPathSecurity.validateLocalFile(url)
+            content = try String(contentsOf: url, encoding: .utf8)
             filePath = path
             isModified = false
         } catch {
-            content = "Error loading file \(path): \(error.localizedDescription)\n\nExpanded path: \(expandedPath)"
+            content = "Error loading file \(path): \(error.localizedDescription)\n\nExpanded path: \(url.path)"
         }
     }
     
     private func saveFile() {
         guard !filePath.isEmpty else { return }
-        let expandedPath = (filePath as NSString).expandingTildeInPath
+        let url = URL(fileURLWithPath: (filePath as NSString).expandingTildeInPath)
         
         do {
-            try content.write(toFile: expandedPath, atomically: true, encoding: .utf8)
+            guard let data = content.data(using: .utf8) else {
+                throw NSError(domain: "DotWeaver.FileEditor", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unable to encode file content"])
+            }
+            try SyncPathSecurity.writeFileAtomically(data, to: url)
             isModified = false
         } catch {
             print("Error saving file: \(error)")

@@ -105,7 +105,6 @@
 
 #### Distribution
 - [ ] GitHub release prepared
-- [ ] Homebrew formula tested
 - [ ] Sparkle appcast.xml validated
 - [ ] Notarization successful
 - [ ] Download links working
@@ -212,7 +211,7 @@
 2. **Triage** - Assign priority
 3. **Assign** - To developer
 4. **Track** - In GitHub Projects
-5. **Communicate** - Update beta testers
+5. **Communicate** - Update early testers
 
 ### Weekly Prioritization (1 hour)
 

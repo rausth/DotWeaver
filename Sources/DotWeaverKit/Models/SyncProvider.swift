@@ -27,3 +27,27 @@ public enum SyncProvider: String, CaseIterable, Identifiable, Codable, Sendable 
         }
     }
 }
+
+public enum ProviderTransportMode: String, CaseIterable, Identifiable, Codable, Sendable {
+    case folder
+    case native
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .folder: return "Mount/Sync Folder"
+        case .native: return "Native Protocol"
+        }
+    }
+}
+
+public struct NativeProviderConfig: Codable, Sendable, Equatable {
+    public var endpoint: String
+    public var username: String
+
+    public init(endpoint: String = "", username: String = "") {
+        self.endpoint = endpoint
+        self.username = username
+    }
+}

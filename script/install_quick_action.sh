@@ -1,14 +1,15 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
 echo "Installing DotWeaver Finder Quick Action..."
 
 WORKFLOW_DIR="$HOME/Library/Services/Add to DotWeaver.workflow"
 CONTENTS_DIR="$WORKFLOW_DIR/Contents"
 mkdir -p "$CONTENTS_DIR"
+chmod 700 "$WORKFLOW_DIR" "$CONTENTS_DIR"
 
 # Create Info.plist
-cat > "$CONTENTS_DIR/Info.plist" <<EOF
+cat > "$CONTENTS_DIR/Info.plist" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -39,7 +40,7 @@ cat > "$CONTENTS_DIR/Info.plist" <<EOF
 EOF
 
 # Create document.wflow
-cat > "$CONTENTS_DIR/document.wflow" <<EOF
+cat > "$CONTENTS_DIR/document.wflow" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -101,7 +102,7 @@ cat > "$CONTENTS_DIR/document.wflow" <<EOF
 				<key>ActionParameters</key>
 				<dict>
 					<key>COMMANDString</key>
-					<string>for f in "\$@"\ndo\n\t/usr/local/bin/dw add "\$f"\ndone\n</string>
+					<string>DW_PATH="$(command -v dw || true)"&#10;if [ -z "$DW_PATH" ]; then&#10;&#9;for candidate in "$HOME/Applications/DotWeaver.app/Contents/MacOS/dw" "/Applications/DotWeaver.app/Contents/MacOS/dw" "/opt/homebrew/bin/dw" "/usr/local/bin/dw"; do&#10;&#9;&#9;if [ -x "$candidate" ]; then&#10;&#9;&#9;&#9;DW_PATH="$candidate"&#10;&#9;&#9;&#9;break&#10;&#9;&#9;fi&#10;&#9;done&#10;fi&#10;if [ -z "$DW_PATH" ]; then&#10;&#9;echo "dw CLI not found" >&amp;2&#10;&#9;exit 1&#10;fi&#10;for f in "$@"&#10;do&#10;&#9;"$DW_PATH" add "$f"&#10;done&#10;</string>
 					<key>CheckedForUserDefaultShell</key>
 					<true/>
 					<key>inputMethod</key>
@@ -253,5 +254,5 @@ cat > "$CONTENTS_DIR/document.wflow" <<EOF
 </plist>
 EOF
 
-echo "✅ Finder Quick Action installed successfully to $WORKFLOW_DIR"
+echo "Finder Quick Action installed successfully to $WORKFLOW_DIR"
 echo "You can now right-click any file in Finder, go to Quick Actions, and select 'Add to DotWeaver'."

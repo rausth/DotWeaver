@@ -1,225 +1,78 @@
-# DotWeaver - What's Left & Next Steps
+# DotWeaver - Next Steps
 
-**Date:** May 28, 2026  
-**Status:** 100% COMPLETE - All code, documentation, and processes implemented. Ready for execution phase.
+**Date:** June 4, 2026
+**Status:** Functional release candidate. Core app, CLI, sync, security hardening, Sparkle packaging, and local release artifact generation are implemented.
 
----
+## Complete
 
-## ✅ What's Complete
+- Native SwiftUI macOS app shell
+- MVVM state management
+- Folder-backed sync engine
+- Native protocol transfer mode for WebDAV/SFTP/FTPS/S3 via system `curl`
+- Git local repository sync
+- Git `pull` / `push` via system Git
+- Provider selection for all app providers
+- Real conflict comparison and resolution against stored provider copies
+- CLI parity commands for files, sync, providers, native config, Git config, snapshots, conflicts, doctor, hooks, templates
+- Snapshot create/list/restore/delete
+- Snapshot path preservation and provider snapshot sync
+- Machine identity, manifests, and version history
+- AES.GCM vault encryption for provider-stored secret files
+- Biometric/device-owner gates for vaulted sync, snapshot restore, and credential reads
+- Hook execution disabled by default with audit entries
+- Symlink and storage-root path checks
+- Template engine
+- File editor
+- Unit/integration tests for core sync behavior
+- Sparkle appcast generation and universal app/CLI packaging
+- Security-scoped bookmarks for GUI-selected files and provider folders
+- Local release bundle signing and Sparkle runtime rpath verification
+- Isolated provider matrix smoke script for Git and all folder-backed providers
+- App launch smoke script with optional Accessibility check
+- Local release/appcast validation script
+- Hosted Sparkle appcast/release asset validation script and release workflow step
+- Mackup config import and basic chezmoi source import/export in CLI
+- Regression tests for provider permissions, native credential rejection, shared provider restore, and interop parsing
 
-### Core Application
-- [x] Native SwiftUI macOS application
-- [x] MVVM architecture with Dependency Injection
-- [x] **Real provider implementations** (all 9 providers functional)
-- [x] **Template engine** (Chezmoi-style variable substitution)
-- [x] **File editor with syntax highlighting**
-- [x] **Conflict resolution UI**
-- [x] **Full CLI commands** (init, add, remove, sync, status, list, edit)
-- [x] **Settings view**
-- [x] Bidirectional sync with conflict detection
-- [x] Touch ID / Face ID biometric authentication
-- [x] Secure Enclave optional key support
-- [x] Keychain credential management
-- [x] CLI tool (dotweaver)
-- [x] Status bar menu
-- [x] Onboarding flow
-- [x] App Sandbox (Home Folder Access only)
-- [x] In-app license viewer
-- [x] Sparkle auto-update integration
-- [x] **Integration tests + Mock provider**
-- [x] **Security audit report**
-- [x] **Performance test suite** (500+ files)
-- [x] **Beta testing program**
-- [x] **Homebrew tap script**
-- [x] **Sparkle appcast.xml**
+## Provider Model
 
-### Documentation
-- [x] Requirements Document
-- [x] Technical Specifications
-- [x] Implementation Plan (12-week roadmap)
-- [x] Change Log
-- [x] Contributing Guide
-- [x] Security Policy
-- [x] Code of Conduct
-- [x] Documentation Index
-- [x] Wiki Structure (Home, Quick-Start, Provider-Setup)
+DotWeaver stores files under:
 
-### CI/CD & Distribution
-- [x] GitHub Actions CI workflow with caching
-- [x] Release workflow with automatic GitHub releases
-- [x] Sparkle appcast.xml configured
-- [x] Homebrew formula
-- [x] Homebrew tap setup script
-- [x] ExportOptions.plist for notarization
+```text
+<provider folder>/.dotweaver/files/
+<provider folder>/.dotweaver/manifests/
+<provider folder>/.dotweaver/versions/
+<provider folder>/.dotweaver/snapshots/
+```
 
-### Code Quality
-- [x] Unit tests (XCTest)
-- [x] .gitignore
-- [x] MIT License
-- [x] Zero AI references
-- [x] Professional project structure
+Current providers use this model:
 
----
+- Git: selected local repository folder, optional remote push/pull
+- iCloud, OneDrive, Google Drive, Dropbox: desktop-client sync folders
+- WebDAV, SFTP, FTPS, S3: mounted/synchronized local folders or Native Protocol endpoints
 
-## 🔄 What's Left (Pre-Deployment)
+Native Protocol mode uses system `curl`; embedded SDK/native-library clients are optional future work if direct SDK integration becomes necessary.
 
-### 1. Code Completion (High Priority)
+## Remaining Work
 
-| Task | Description | Effort | Status |
-|------|-------------|--------|--------|
-| **Provider Implementations** | Real sync logic for all providers | 2-3 days | ✅ DONE |
-| **Template Engine** | Chezmoi-style variable substitution | 1-2 days | ✅ DONE |
-| **File Editor** | Syntax highlighting support | 1 day | ✅ DONE |
-| **Conflict Resolution UI** | Manual merge interface | 2 days | ✅ DONE |
-| **CLI Commands** | All subcommands (init, add, remove, etc.) | 2 days | ✅ DONE |
-| **Settings View** | Preferences window | 1 day | ✅ DONE |
+| Task | Priority | Status |
+|------|----------|--------|
+| Live notarization with Apple Developer credentials | High | Pending external credentials |
+| Live hosted Sparkle run with real signed appcast | Medium | Automation implemented; pending hosted release + Sparkle private key |
+| External security audit | Medium | Optional before public distribution |
+| Full Mackup application preset catalog | Medium | Optional v1.x growth work |
+| Advanced chezmoi template/script compatibility | Medium | Optional v1.x growth work |
+| Embedded SDK/native-library WebDAV/SFTP/FTPS/S3 clients, if required | Low | Optional future work |
 
-### 2. Testing (High Priority)
+## Verification
 
-| Task | Description | Effort | Status |
-|------|-------------|--------|--------|
-| **Integration Tests** | Test all 9 providers with mock servers | 2 days | ✅ DONE |
-| **UI Tests** | XCUITest for critical user flows | 2 days | ⏳ Next |
-| **Performance Tests** | Test with 500+ dotfiles | 1 day | ✅ DONE |
-| **Beta Testing** | Recruit 50-100 beta users | 2 weeks | ⏳ Ready to launch |
+Current baseline:
 
-### 3. Security & Compliance (Medium Priority)
+```bash
+swift test
+script/smoke_provider_matrix.sh
+script/validate_release_local.sh
+script/smoke_app_ui.sh
+```
 
-| Task | Description | Effort | Status |
-|------|-------------|--------|--------|
-| **Security Audit** | Professional security review | 3-5 days | ✅ Audit prep complete |
-| **Penetration Testing** | External security testing | 2-3 days | ⏳ Next |
-| **App Store Review** | Prepare for potential App Store submission | 1 day | ⏳ Pending |
-| **Privacy Policy** | Create privacy policy document | 1 day | ⏳ Pending |
-
-### 4. Documentation (Low Priority)
-
-| Task | Description | Effort |
-|------|-------------|--------|
-| **User Guide** | Comprehensive user manual with screenshots | 2 days |
-| **Video Tutorials** | Create onboarding videos | 2-3 days |
-| **API Documentation** | Document public APIs for custom providers | 1 day |
-
----
-
-## 🚀 Next Steps (Recommended Order)
-
-### ✅ Week 1-2: COMPLETE
-- [x] Real provider implementations
-- [x] Template engine
-- [x] File editor with syntax highlighting
-- [x] Conflict resolution UI
-- [x] Full CLI commands
-- [x] Settings view
-- [x] Integration tests
-- [x] Performance testing (500+ files)
-- [x] Security audit preparation
-- [x] Beta testing program
-
-### ⏳ Week 3: Beta Release (IN PROGRESS)
-1. **Create beta build** - Ready
-2. **Recruit beta testers** - Script ready, launch June 1
-3. **Gather feedback** - In-app + GitHub
-4. **Fix critical issues** - Triage process defined
-
-### ⏳ Week 4: Public Release
-1. **Final security review** - External firm scheduled
-2. **Create release v1.0.0** - June 20, 2026
-3. **Publish to GitHub** - Automated via release workflow
-4. **Announce on social media / Product Hunt**
-5. **Submit to Homebrew core** (after tap validation)
-
----
-
-## 📋 Pre-Release Checklist
-
-### Code
-- [ ] All stub providers replaced with real implementations
-- [ ] Template engine fully functional
-- [ ] All CLI commands implemented
-- [ ] Settings view complete
-- [ ] Conflict resolution UI working
-- [ ] No compiler warnings
-- [ ] All tests passing (85%+ coverage)
-
-### Security
-- [ ] Security audit completed
-- [ ] No critical vulnerabilities
-- [ ] Certificate pinning implemented for all HTTP providers
-- [ ] SSH key validation for SFTP
-- [ ] Input validation on all user inputs
-
-### Documentation
-- [ ] User guide complete with screenshots
-- [ ] API documentation published
-- [ ] Privacy policy published
-- [ ] Security policy published
-
-### Distribution
-- [ ] GitHub release created with binaries
-- [ ] Homebrew tap tested and working
-- [ ] Sparkle appcast.xml hosted and accessible
-- [ ] Notarization successful
-- [ ] Sparkle auto-updates tested end-to-end
-
-### Marketing
-- [ ] Website/landing page created
-- [ ] Screenshots and demo video ready
-- [ ] Social media announcement prepared
-- [ ] Product Hunt / Hacker News submission ready
-
----
-
-## 🎯 Success Metrics (Post-Release)
-
-| Metric | Target (30 days) | Target (90 days) |
-|--------|------------------|------------------|
-| GitHub Stars | 100+ | 500+ |
-| Downloads | 500+ | 2,000+ |
-| Homebrew Installs | 100+ | 1,000+ |
-| App Store Rating | 4.5+ | 4.5+ |
-| Active Users | 200+ | 1,000+ |
-| GitHub Issues Resolved | 90%+ | 95%+ |
-
----
-
-## 📞 Support & Maintenance
-
-### Post-Release Support
-- Monitor GitHub Issues daily
-- Respond to issues within 48 hours
-- Release bug fixes within 1 week
-- Feature requests evaluated monthly
-
-### Maintenance Tasks
-- Update dependencies monthly
-- Security patches within 48 hours of disclosure
-- macOS compatibility updates with new OS releases
-- Provider API compatibility (monitor for breaking changes)
-
----
-
-## 🎉 Conclusion
-
-DotWeaver is **100% feature complete** and ready for beta testing!
-
-All planned features have been implemented:
-- ✅ Real provider implementations
-- ✅ Template engine
-- ✅ File editor with syntax highlighting
-- ✅ Conflict resolution UI
-- ✅ Full CLI commands
-- ✅ Settings view
-- ✅ Integration tests
-- ✅ Performance testing (500+ files)
-- ✅ Security audit preparation
-- ✅ Beta testing program
-- ✅ Homebrew tap script
-- ✅ Sparkle appcast.xml
-
-**Estimated time to v1.0.0 release: 2-3 weeks** (beta testing + final polish)
-
----
-
-**Document Version:** 1.0  
-**Last Updated:** May 28, 2026
+Expected result: tests pass, release artifacts are generated, app signature verifies.

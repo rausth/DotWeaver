@@ -152,13 +152,10 @@ final class PerformanceTestSuite: XCTestCase {
     // MARK: - Performance Tests
     
     func testSyncPerformance_500Files() async throws {
-        let provider = MockSyncProvider()
-        provider.delay = 0.001 // Simulate fast network
-        
-        let dotfiles = PerformanceTestSuite.generateLargeDotfileSet(count: 500)
+        let fixture = try makeFolderProviderFixture(count: 500)
         
         let startTime = Date()
-        let result = try await provider.syncBidirectional(dotfiles: dotfiles)
+        let result = try await fixture.provider.syncBidirectional(dotfiles: fixture.dotfiles)
         let duration = Date().timeIntervalSince(startTime)
         
         XCTAssertEqual(result.count, 500)
@@ -168,19 +165,49 @@ final class PerformanceTestSuite: XCTestCase {
     }
     
     func testSyncPerformance_1000Files() async throws {
-        let provider = MockSyncProvider()
-        provider.delay = 0.0005
-        
-        let dotfiles = PerformanceTestSuite.generateLargeDotfileSet(count: 1000)
+        let fixture = try makeFolderProviderFixture(count: 1000)
         
         let startTime = Date()
-        let result = try await provider.syncBidirectional(dotfiles: dotfiles)
+        let result = try await fixture.provider.syncBidirectional(dotfiles: fixture.dotfiles)
         let duration = Date().timeIntervalSince(startTime)
         
         XCTAssertEqual(result.count, 1000)
         XCTAssertLessThan(duration, 10.0, "Sync should complete in under 10 seconds for 1000 files")
         
         print("✅ 1000 file sync completed in \(String(format: "%.2f", duration))s")
+    }
+
+    private func makeFolderProviderFixture(count: Int) throws -> (provider: FolderSyncProvider, dotfiles: [Dotfile]) {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DotWeaverPerformanceTests")
+            .appendingPathComponent(UUID().uuidString)
+        let localRoot = root.appendingPathComponent("local")
+        let storageRoot = root.appendingPathComponent("storage")
+        try FileManager.default.createDirectory(at: localRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: storageRoot, withIntermediateDirectories: true)
+
+        let dotfiles = try PerformanceTestSuite.generateLargeDotfileSet(count: count).map { dotfile in
+            let localURL = localRoot.appendingPathComponent(dotfile.path)
+            try FileManager.default.createDirectory(at: localURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try "DOTWEAVER_PERF_TEST=1\n".write(to: localURL, atomically: true, encoding: .utf8)
+            return Dotfile(
+                id: dotfile.id,
+                path: localURL.path,
+                lastLocalModified: dotfile.lastLocalModified,
+                lastRemoteModified: dotfile.lastRemoteModified,
+                lastSynced: dotfile.lastSynced,
+                status: dotfile.status,
+                conflictStrategy: dotfile.conflictStrategy,
+                isMonitored: dotfile.isMonitored,
+                isSecret: dotfile.isSecret,
+                tags: dotfile.tags,
+                group: dotfile.group,
+                preSyncHook: dotfile.preSyncHook,
+                postSyncHook: dotfile.postSyncHook
+            )
+        }
+
+        return (FolderSyncProvider(name: .onedrive, storageRootProvider: { storageRoot.path }), dotfiles)
     }
     
     func testMemoryUsage_500Files() async throws {

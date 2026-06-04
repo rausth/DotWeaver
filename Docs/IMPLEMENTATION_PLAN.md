@@ -31,7 +31,7 @@
 1. Set up GitHub repository with proper branching strategy (`main`, `develop`, feature branches)
 2. Configure CI/CD pipeline (GitHub Actions) with build, test, and lint stages
 3. Implement `DotfilesViewModel` with `@MainActor` and published properties
-4. Create mock providers for testing
+4. Create test doubles for provider tests
 5. Build initial UI shell (sidebar + detail view)
 
 **Success Criteria:**
@@ -77,24 +77,23 @@
 **Deliverables:**
 - [ ] Template engine (Chezmoi-style variable substitution)
 - [ ] Integrated file editor with syntax highlighting
-- [ ] Full CLI implementation (`dotweaver` command)
-- [ ] Secure Enclave optional key for signing
+- [ ] CLI implementation for add/remove/status/list/vault workflows
+- [ ] Keychain-protected vault key
 - [ ] Status bar menu (macOS menu bar extra)
 - [ ] Onboarding flow with permission explanations
-- [ ] Homebrew formula and tap
 
 **Key Tasks:**
 1. Implement `TemplateEngine` with variable substitution
 2. Build `FileEditorView` with basic syntax highlighting
 3. Create CLI using Swift Argument Parser
-4. Add Secure Enclave key generation and signing
+4. Add vault key generation and encrypted provider payloads
 5. Implement Sparkle auto-update framework
 6. Write comprehensive user documentation
 
 **Success Criteria:**
 - Template rendering tested with 20+ template files
 - CLI commands documented and tested
-- Homebrew installation tested on clean macOS 15 VM
+- Direct download installation tested on clean macOS 15 VM
 
 ---
 
@@ -132,14 +131,14 @@
 | 3 | 5-6 | Cloud Providers | "As a user, I can sync with iCloud, OneDrive, and Dropbox" |
 | 4 | 7-8 | Remote & Security | "As a user, I can use SFTP/WebDAV with biometric auth" |
 | 5 | 9-10 | Polish & CLI | "As a power user, I can use the CLI for automation" |
-| 6 | 11-12 | Release | "As a user, I can install via Homebrew and receive updates" |
+| 6 | 11-12 | Release | "As a user, I can install the signed app and receive updates" |
 
 ## 4. Risk Management
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|------------|--------|------------|
 | macOS Sandbox restrictions block file access | Medium | High | Early sandbox testing; clear user permission flow |
-| Secure Enclave not available on all Macs | Low | Medium | Make Secure Enclave features optional with fallback |
+| Secure Enclave not available on all Macs | Low | Medium | Keep Secure Enclave wrapping optional; Keychain remains baseline |
 | Provider API changes (OneDrive, Google Drive) | Medium | Medium | Abstract provider interfaces; monitor API deprecations |
 | Performance issues with large dotfile sets | Low | Medium | Implement incremental sync; add progress indicators |
 | App Store rejection | Low | High | Follow Apple guidelines; prepare for direct distribution |
@@ -150,18 +149,15 @@
 - Xcode 16+
 - Swift 6.0
 - Git + GitHub
-- Homebrew (for distribution testing)
 
 **Testing Infrastructure:**
 - GitHub Actions (CI/CD)
 - macOS 15 virtual machines (for testing)
-- Physical M-series Mac (for Secure Enclave / Touch ID testing)
+- Physical Mac for Touch ID testing
 
 **External Services (for testing):**
 - Test Git repository
-- Test WebDAV server
-- Test S3 bucket
-- Test SFTP server
+- Mounted or synchronized provider folders
 
 ## 6. Definition of Done
 
@@ -176,7 +172,7 @@ A feature is considered "done" when:
 ## 7. Post-Release Roadmap (v1.1+)
 
 - [ ] Passkey support for provider authentication
-- [ ] Encrypted dotfile content (end-to-end encryption)
+- [x] Encrypted vaulted dotfile content
 - [ ] Team/shared dotfile repositories
 - [ ] VS Code extension for editing
 - [ ] Windows/Linux CLI client (cross-platform)

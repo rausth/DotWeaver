@@ -6,7 +6,6 @@ actor CredentialManager {
     private init() {}
     
     private let serviceName = "com.rausth.DotWeaver"
-    private let accessGroup = "$(TeamIdentifierPrefix)com.rausth.DotWeaver"
     
     func savePassword(for provider: SyncProvider, account: String, password: String) throws {
         let query: [String: Any] = [
@@ -14,8 +13,7 @@ actor CredentialManager {
             kSecAttrService as String: serviceName,
             kSecAttrAccount as String: "\(provider.rawValue).\(account)",
             kSecValueData as String: password.data(using: .utf8)!,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
-            kSecAttrAccessGroup as String: accessGroup
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         ]
         
         SecItemDelete(query as CFDictionary)
@@ -25,14 +23,17 @@ actor CredentialManager {
         }
     }
     
-    func getPassword(for provider: SyncProvider, account: String) throws -> String? {
+    func getPassword(for provider: SyncProvider, account: String) async throws -> String? {
+        if SecurityPolicy.requiresBiometricAuthentication {
+            _ = try await BiometricAuthenticator.shared.authenticate(reason: "Authenticate to access \(provider.title) credentials")
+        }
+
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: serviceName,
             kSecAttrAccount as String: "\(provider.rawValue).\(account)",
             kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-            kSecAttrAccessGroup as String: accessGroup
+            kSecMatchLimit as String: kSecMatchLimitOne
         ]
         
         var item: CFTypeRef?

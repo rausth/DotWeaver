@@ -6,6 +6,7 @@ struct SettingsView: View {
     @EnvironmentObject private var viewModel: DotfilesViewModel
     @AppStorage("launchAtLogin") private var launchAtLogin: Bool = false
     @AppStorage("biometricEnabled") private var biometricEnabled: Bool = true
+    @AppStorage("hooksEnabled") private var hooksEnabled: Bool = false
     
     @State private var autoSyncEnabled: Bool = true
     @State private var syncInterval: Double = 300 // 5 minutes
@@ -142,9 +143,16 @@ struct SettingsView: View {
                         Text("DotWeaver will keep your local repo synchronized with your chosen host.")
                             .font(.caption)
                     }
-                } else if viewModel.selectedProvider == .icloud || viewModel.selectedProvider == .dropbox || viewModel.selectedProvider == .googledrive || viewModel.selectedProvider == .onedrive {
+                } else {
                     Section {
                         VStack(alignment: .leading, spacing: 12) {
+                            Picker("Transport", selection: transportBinding(for: viewModel.selectedProvider)) {
+                                ForEach(ProviderTransportMode.allCases) { mode in
+                                    Text(mode.title).tag(mode)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+
                             HStack(spacing: 12) {
                                 Image(systemName: icon(for: viewModel.selectedProvider))
                                     .font(.title2)
@@ -156,13 +164,27 @@ struct SettingsView: View {
                                 
                                 Spacer()
                                 
-                                Button(action: selectCloudFolder) {
-                                    Label("Change Folder", systemImage: "folder.badge.plus")
+                                if viewModel.transportMode(for: viewModel.selectedProvider) == .folder {
+                                    Button(action: selectCloudFolder) {
+                                        Label("Change Folder", systemImage: "folder.badge.plus")
+                                    }
+                                    .buttonStyle(.bordered)
                                 }
-                                .buttonStyle(.bordered)
                             }
-                            
-                            if !viewModel.cloudSyncPath.isEmpty {
+
+                            if viewModel.transportMode(for: viewModel.selectedProvider) == .native {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    TextField("Endpoint URL (webdav://, sftp://, ftps://, https://)", text: nativeEndpointBinding(for: viewModel.selectedProvider))
+                                        .textFieldStyle(.roundedBorder)
+
+                                    TextField("Username / curl --user value (optional)", text: nativeUsernameBinding(for: viewModel.selectedProvider))
+                                        .textFieldStyle(.roundedBorder)
+
+                                    Text("Native mode transfers files over the protocol endpoint with system curl. Passwords are not stored; use SSH keys, .netrc, endpoint tokens, or provider credential helpers.")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            } else if !viewModel.cloudSyncPath.isEmpty {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("Current Sync Path:")
                                         .font(.caption.bold())
@@ -197,7 +219,7 @@ struct SettingsView: View {
                         }
                         .padding(.vertical, 4)
                     } header: {
-                        Text("Cloud Configuration")
+                        Text("Folder Configuration")
                             .font(.headline)
                     }
                 }
@@ -224,6 +246,19 @@ struct SettingsView: View {
                     Text("Authentication")
                         .font(.headline)
                 }
+
+                Section {
+                    Toggle("Allow pre/post sync hook scripts", isOn: $hooksEnabled)
+                        .toggleStyle(.switch)
+
+                    Text("Hooks execute zsh script files from ~/.dotweaver/hooks. Keep disabled unless every hook is trusted.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 4)
+                } header: {
+                    Text("Hook Execution")
+                        .font(.headline)
+                }
             }
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)
@@ -236,9 +271,10 @@ struct SettingsView: View {
             Form {
                 Section {
                     Button(action: installCLI) {
-                        Label("Install 'dw' to /usr/local/bin", systemImage: "terminal.fill")
+                        Label("Install 'dw' to PATH", systemImage: "terminal.fill")
                     }
                     .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("settings.installCLI")
                     
                     Text("This will create a symlink to the DotWeaver CLI tool in your system path, allowing you to use the 'dw' command from any terminal.")
                         .font(.caption)
@@ -269,6 +305,7 @@ struct SettingsView: View {
         panel.prompt = "Select Sync Folder"
         
         if panel.runModal() == .OK, let url = panel.url {
+            try? SecurityScopedBookmarks.register(url)
             viewModel.cloudSyncPath = url.path
         }
         #endif
@@ -284,9 +321,39 @@ struct SettingsView: View {
         panel.prompt = "Select Local Git Repo"
         
         if panel.runModal() == .OK, let url = panel.url {
+            try? SecurityScopedBookmarks.register(url)
             viewModel.gitLocalPath = url.path
         }
         #endif
+    }
+
+    private func transportBinding(for provider: SyncProvider) -> Binding<ProviderTransportMode> {
+        Binding(
+            get: { viewModel.transportMode(for: provider) },
+            set: { viewModel.setTransportMode($0, for: provider) }
+        )
+    }
+
+    private func nativeEndpointBinding(for provider: SyncProvider) -> Binding<String> {
+        Binding(
+            get: { viewModel.nativeConfig(for: provider).endpoint },
+            set: {
+                var config = viewModel.nativeConfig(for: provider)
+                config.endpoint = $0
+                viewModel.setNativeConfig(config, for: provider)
+            }
+        )
+    }
+
+    private func nativeUsernameBinding(for provider: SyncProvider) -> Binding<String> {
+        Binding(
+            get: { viewModel.nativeConfig(for: provider).username },
+            set: {
+                var config = viewModel.nativeConfig(for: provider)
+                config.username = $0
+                viewModel.setNativeConfig(config, for: provider)
+            }
+        )
     }
     
     private func updateLoginItem(_ enabled: Bool) {
@@ -301,9 +368,14 @@ struct SettingsView: View {
         #if os(macOS)
         let bundlePath = Bundle.main.bundlePath
         let cliPath = "\(bundlePath)/Contents/MacOS/dw"
+        #if arch(arm64)
+        let installPath = "/opt/homebrew/bin/dw"
+        #else
         let installPath = "/usr/local/bin/dw"
+        #endif
+        let installDir = (installPath as NSString).deletingLastPathComponent
         
-        let script = "do shell script \"mkdir -p /usr/local/bin && ln -sf '\(cliPath)' '\(installPath)'\" with administrator privileges"
+        let script = "do shell script \"mkdir -p \(shellQuoted(installDir)) && ln -sf \(shellQuoted(cliPath)) \(shellQuoted(installPath))\" with administrator privileges"
         
         let appleScript = NSAppleScript(source: script)
         var error: NSDictionary?
@@ -312,9 +384,13 @@ struct SettingsView: View {
         if let error = error {
             print("Error installing CLI: \(error)")
         } else {
-            viewModel.statusMessage = "✅ CLI 'dw' installed to /usr/local/bin"
+            viewModel.statusMessage = "CLI 'dw' installed to \(installPath)"
         }
         #endif
+    }
+
+    private func shellQuoted(_ value: String) -> String {
+        "'\(value.replacingOccurrences(of: "'", with: "'\"'\"'"))'"
     }
     
     private func icon(for provider: SyncProvider) -> String {

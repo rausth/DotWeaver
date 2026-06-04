@@ -44,25 +44,34 @@ DotWeaver implements multiple layers of security:
 ### Credential Protection
 - All passwords stored in macOS Keychain
 - Biometric authentication (Touch ID / Face ID) required for sensitive operations
-- Optional Secure Enclave hardware-backed keys
-- Keychain Access Groups for secure sharing between app and CLI
+- Vault master key wrapped with Secure Enclave when available
+- Unsupported hardware falls back to Keychain storage with `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`
+- Keychain items are device-local and scoped to DotWeaver services
 
 ### Network Security
-- TLS 1.3 enforcement for all HTTP providers
-- Certificate pinning for known providers
-- SSH key authentication for SFTP (no password transmission)
-- 30-second connection timeout with exponential backoff
+- Git network operations are delegated to the system `git` binary.
+- Folder-backed providers delegate remote transport to the selected desktop client or mount tool.
+- Native Protocol providers delegate transfer to system `curl`.
+- DotWeaver does not store native protocol passwords; use SSH keys, `.netrc`, endpoint tokens, or credential helpers.
+- Native WebDAV endpoints must use TLS (`https` or `webdavs`).
+- Review and secure the external sync, mount, or credential tool used for remote storage.
 
 ### Application Security
 - App Sandbox with Home Folder Access only
+- GUI-selected files and provider folders are persisted with security-scoped bookmarks
 - No Full Disk Access required
 - No telemetry or analytics collection
 - Zero-knowledge architecture (credentials never leave device)
 
 ### Data Protection
+- Vaulted files encrypted with AES.GCM before provider storage
+- Provider snapshots preserve paths and encrypt vaulted entries
+- Symlink paths and non-home local paths are rejected during sync/snapshot/restore operations
+- Native Protocol mode rejects unsupported URL schemes and stored password formats
+- Hook execution is disabled by default, restricted to zsh scripts under `~/.dotweaver/hooks`, and audited when skipped or executed
 - All data encrypted at rest using macOS Data Protection
-- No cloud storage of sensitive configuration
-- Secure deletion of temporary files
+- Synced files are stored only in the provider folder selected by the user
+- Temporary native-transfer payloads are created in private `0700` directories and written with `0600` permissions
 
 ## Security Best Practices for Users
 

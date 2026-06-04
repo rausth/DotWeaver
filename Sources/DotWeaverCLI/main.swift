@@ -1,3 +1,9 @@
 import Foundation
 import DotWeaverKit
-CLICommands.run()
+
+Task {
+    await CLICommands.run()
+    exit(0)
+}
+
+dispatchMain()

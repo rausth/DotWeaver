@@ -33,7 +33,7 @@ DotWeaver provides a unified interface for managing dotfiles using various stora
 | FR-08 | Keychain Integration | High | Secure storage of provider credentials using macOS Keychain |
 | FR-09 | Touch ID / Face ID | High | Biometric authentication for accessing sensitive operations |
 | FR-10 | Secure Enclave Support | Medium | Optional hardware-backed private key for signing operations |
-| FR-11 | Sandbox Compliance | High | App Sandbox with Home Folder Access only (no Full Disk Access) |
+| FR-11 | Sandbox Compliance | High | App Sandbox with security-scoped bookmarks for selected resources and no Full Disk Access |
 | FR-12 | Encrypted Transit | High | All network communications use TLS/SSH with certificate validation |
 
 ### 2.3 User Interface Requirements
