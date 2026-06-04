@@ -78,14 +78,14 @@ echo "Check release asset: $ENCLOSURE_URL"
 HEADERS_FILE="$TMP_DIR/headers.txt"
 curl -fsSLI "$ENCLOSURE_URL" -o "$HEADERS_FILE"
 
-STATUS="$(awk 'toupper($0) ~ /^HTTP\\// { code=$2 } END { print code }' "$HEADERS_FILE")"
+STATUS="$(grep -i '^HTTP/' "$HEADERS_FILE" | tail -n 1 | awk '{ print $2 }')"
 if [[ "$STATUS" != "200" && "$STATUS" != "302" ]]; then
   echo "Unexpected enclosure HTTP status: ${STATUS:-unknown}" >&2
   cat "$HEADERS_FILE" >&2
   exit 1
 fi
 
-REMOTE_LENGTH="$(awk 'BEGIN{IGNORECASE=1} /^content-length:/ { gsub("\r", "", $2); length=$2 } END { print length }' "$HEADERS_FILE")"
+REMOTE_LENGTH="$(grep -i '^content-length:' "$HEADERS_FILE" | tail -n 1 | tr -d '\r' | awk '{ print $2 }')"
 if [[ -n "$REMOTE_LENGTH" && "$REMOTE_LENGTH" != "$ENCLOSURE_LENGTH" ]]; then
   echo "Warning: remote content-length $REMOTE_LENGTH differs from appcast length $ENCLOSURE_LENGTH" >&2
 fi
