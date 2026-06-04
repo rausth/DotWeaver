@@ -13,7 +13,7 @@ jobs:
       contents: write
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      NOTARIZE: "1"
+      NOTARIZE: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 != '' && secrets.MACOS_CERTIFICATE_PASSWORD != '' && secrets.DEVELOPER_ID_APPLICATION != '' && secrets.APPLE_ID != '' && secrets.APPLE_TEAM_ID != '' && secrets.APPLE_APP_SPECIFIC_PASSWORD != '' && '1' || '0' }}
       PRODUCT_BUNDLE_IDENTIFIER: com.rausth.DotWeaver
       SPARKLE_FEED_URL: https://github.com/rausth/DotWeaver/releases/latest/download/appcast.xml
       SPARKLE_PUBLIC_ED_KEY: ${{ secrets.SPARKLE_PUBLIC_ED_KEY }}
@@ -28,6 +28,7 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode_16.0.app
 
       - name: Import Developer ID certificate
+        if: ${{ env.NOTARIZE == '1' }}
         env:
           MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
           MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
@@ -49,7 +50,7 @@ jobs:
       - name: Generate appcast
         env:
           DOWNLOAD_BASE_URL: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}
-          REQUIRE_SPARKLE_SIGNATURE: "1"
+          REQUIRE_SPARKLE_SIGNATURE: ${{ secrets.SPARKLE_PRIVATE_KEY != '' && '1' || '0' }}
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: script/generate_appcast.sh
 
@@ -68,5 +69,5 @@ jobs:
       - name: Validate hosted Sparkle assets
         env:
           APPCAST_URL: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/appcast.xml
-          REQUIRE_SPARKLE_SIGNATURE: "1"
+          REQUIRE_SPARKLE_SIGNATURE: ${{ secrets.SPARKLE_PRIVATE_KEY != '' && '1' || '0' }}
         run: script/validate_hosted_sparkle.sh

@@ -11,9 +11,11 @@ git push origin v1.0.0
 
 The workflow can also run manually with `workflow_dispatch`.
 
+If Apple signing secrets are absent, the workflow builds ad-hoc signed release artifacts and skips notarization. If Sparkle private-key secret is absent, the workflow generates an unsigned appcast and validates hosted delivery without requiring `sparkle:edSignature`.
+
 ## Workflow
 
-1. Import Developer ID certificate into a temporary keychain.
+1. Import Developer ID certificate into a temporary keychain when signing secrets are present.
 2. Run `swift test`.
 3. Run `script/package_release.sh`.
 4. Generate `appcast.xml` with `script/generate_appcast.sh`.
@@ -76,3 +78,5 @@ Validation checks:
 - release ZIP is reachable
 
 The release workflow runs this check after publishing assets.
+
+For production distribution, configure all Apple notarization secrets and both Sparkle key secrets before tagging the release.
