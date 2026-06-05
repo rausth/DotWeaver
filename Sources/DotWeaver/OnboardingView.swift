@@ -81,10 +81,7 @@ struct OnboardingView: View {
     
     var stepOne: some View {
         VStack(spacing: 20) {
-            Image(systemName: "doc.text.magnifyingglass")
-                .font(.system(size: 80))
-                .foregroundStyle(LinearGradient(colors: [.blue, .cyan], startPoint: .top, endPoint: .bottom))
-                .shadow(radius: 10)
+            DotWeaverBrandIcon(size: 112)
             
             Text("Welcome to DotWeaver")
                 .font(.system(size: 40, weight: .black, design: .rounded))

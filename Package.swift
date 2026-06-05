@@ -24,7 +24,8 @@ let package = Package(
                 .product(name: "Sparkle", package: "Sparkle")
             ],
             resources: [
-                .copy("LICENSE")
+                .copy("LICENSE"),
+                .process("Resources")
             ]
         ),
         .executableTarget(

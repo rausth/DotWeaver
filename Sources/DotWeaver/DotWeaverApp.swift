@@ -46,7 +46,7 @@ struct DotWeaver: App {
             }
         }
         
-        MenuBarExtra("DotWeaver", systemImage: "doc.text.magnifyingglass") {
+        MenuBarExtra("DotWeaver", image: "dotweaver-icon") {
             Button("Sync Now") {
                 Task {
                     await viewModel.syncBidirectional()

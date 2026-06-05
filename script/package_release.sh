@@ -73,6 +73,12 @@ copy_sparkle_framework() {
 
 copy_sparkle_framework
 
+RESOURCE_BUNDLE="${ARM_DIR}/DotWeaver_DotWeaver.bundle"
+if [[ -d "$RESOURCE_BUNDLE" ]]; then
+  echo "Copy DotWeaver resource bundle"
+  ditto "$RESOURCE_BUNDLE" "${RESOURCES_DIR}/DotWeaver_DotWeaver.bundle"
+fi
+
 RPATH_CHECK_FILE="${RELEASE_DIR}/DotWeaver.rpaths.txt"
 otool -l "${MACOS_DIR}/DotWeaver" > "$RPATH_CHECK_FILE"
 if ! grep -q "@executable_path/../Frameworks" "$RPATH_CHECK_FILE"; then
