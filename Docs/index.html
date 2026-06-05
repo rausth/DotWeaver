@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="DotWeaver is a native macOS app and CLI for syncing dotfiles across machines with snapshots, conflict handling, and encrypted secrets.">
+    <meta property="og:title" content="DotWeaver">
+    <meta property="og:description" content="Native macOS dotfiles sync with provider-backed storage, snapshots, conflict resolution, and vault encryption.">
+    <meta property="og:image" content="assets/dotweaver-icon.png">
+    <meta property="og:type" content="website">
+    <title>DotWeaver</title>
+    <link rel="icon" href="assets/dotweaver-icon.png">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="topbar" aria-label="Primary navigation">
+      <a class="brand" href="#top" aria-label="DotWeaver home">
+        <img src="assets/dotweaver-icon.png" alt="" width="32" height="32">
+        <span>DotWeaver</span>
+      </a>
+      <nav>
+        <a href="#providers">Providers</a>
+        <a href="#security">Security</a>
+        <a href="#cli">CLI</a>
+        <a href="https://github.com/rausth/DotWeaver">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">Native macOS dotfiles manager</p>
+          <h1 id="hero-title">DotWeaver</h1>
+          <p class="lead">Sync shell, editor, Git, and tool configuration across Macs with provider-backed storage, snapshots, conflict resolution, and encrypted secrets.</p>
+          <div class="actions" aria-label="Download actions">
+            <a class="button primary" href="https://github.com/rausth/DotWeaver/releases/download/v1.0.0/DotWeaver-1.0.0-macOS-universal.zip">Download v1.0.0</a>
+            <a class="button secondary" href="https://github.com/rausth/DotWeaver/releases/download/v1.0.0/dw-1.0.0-macOS-universal.tar.gz">CLI tarball</a>
+          </div>
+          <dl class="facts">
+            <div>
+              <dt>Platform</dt>
+              <dd>macOS 15+</dd>
+            </div>
+            <div>
+              <dt>Release</dt>
+              <dd>v1.0.0</dd>
+            </div>
+            <div>
+              <dt>License</dt>
+              <dd>MIT</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div class="product-shot" aria-label="DotWeaver interface preview">
+          <div class="window">
+            <div class="traffic" aria-hidden="true"><span></span><span></span><span></span></div>
+            <div class="window-grid">
+              <aside>
+                <img src="assets/dotweaver-icon.png" alt="" width="88" height="88">
+                <strong>DotWeaver</strong>
+                <span>Provider: iCloud</span>
+                <span>Status: Synced</span>
+              </aside>
+              <div class="panel">
+                <div class="toolbar">
+                  <span>Managed dotfiles</span>
+                  <b>23</b>
+                </div>
+                <ul class="file-list" aria-label="Example synced dotfiles">
+                  <li><span>.zshrc</span><em>synced</em></li>
+                  <li><span>.gitconfig</span><em>synced</em></li>
+                  <li><span>.config/nvim/init.lua</span><em>snapshot</em></li>
+                  <li><span>.ssh/config</span><em>vaulted</em></li>
+                </ul>
+                <div class="status-row">
+                  <span>Last sync</span>
+                  <strong>now</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="band" id="providers" aria-labelledby="providers-title">
+        <div class="section-head">
+          <p class="eyebrow">Storage</p>
+          <h2 id="providers-title">Bring your own provider</h2>
+        </div>
+        <div class="provider-grid">
+          <span>iCloud</span>
+          <span>OneDrive</span>
+          <span>Google Drive</span>
+          <span>Dropbox</span>
+          <span>WebDAV</span>
+          <span>SFTP</span>
+          <span>FTPS</span>
+          <span>S3</span>
+          <span>Git</span>
+        </div>
+      </section>
+
+      <section class="split" id="security" aria-labelledby="security-title">
+        <div>
+          <p class="eyebrow">Protection</p>
+          <h2 id="security-title">Built for sensitive config</h2>
+          <p>Vaulted files are encrypted before provider storage. Snapshot restore, vaulted sync, and credential reads can require biometric or device-owner authentication.</p>
+        </div>
+        <div class="checks" aria-label="Security features">
+          <div><strong>AES.GCM vault</strong><span>Local master key stored through Keychain support.</span></div>
+          <div><strong>Path containment</strong><span>Traversal and symlink escape checks protect sync roots.</span></div>
+          <div><strong>Audit trail</strong><span>Security-sensitive sync, hook, and snapshot events are recorded.</span></div>
+        </div>
+      </section>
+
+      <section class="cli" id="cli" aria-labelledby="cli-title">
+        <div>
+          <p class="eyebrow">Terminal</p>
+          <h2 id="cli-title">Full dw workflow</h2>
+        </div>
+        <pre><code>dw add ~/.zshrc
+dw provider set icloud
+dw provider folder ~/Library/Mobile\ Documents/com~apple~CloudDocs/DotWeaver
+dw sync
+dw snapshot create before-terminal-change
+dw vault ~/.ssh/id_ed25519</code></pre>
+      </section>
+    </main>
+
+    <footer>
+      <span>DotWeaver v1.0.0</span>
+      <a href="https://github.com/rausth/DotWeaver/releases/tag/v1.0.0">Release notes</a>
+      <a href="https://github.com/rausth/DotWeaver/blob/main/Docs/wiki/Provider-Setup.md">Provider setup</a>
+    </footer>
+  </body>
+</html>
