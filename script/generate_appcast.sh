@@ -32,7 +32,11 @@ if [[ -n "${SPARKLE_PRIVATE_KEY_FILE:-}" ]]; then
 fi
 
 FILENAME="$(basename "$APP_ZIP")"
-LENGTH="$(stat -f%z "$APP_ZIP")"
+if LENGTH="$(stat -f%z "$APP_ZIP" 2>/dev/null)"; then
+  :
+else
+  LENGTH="$(stat -c%s "$APP_ZIP")"
+fi
 PUB_DATE="$(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S +0000')"
 DOWNLOAD_URL="${DOWNLOAD_BASE_URL}/${FILENAME}"
 SIGNATURE_ATTRIBUTE=""

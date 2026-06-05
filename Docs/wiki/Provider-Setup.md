@@ -67,6 +67,27 @@ https://bucket.s3.amazonaws.com/prefix/
 
 Native mode uses system `curl` for protocol transfer. Passwords are not stored by DotWeaver. Use SSH keys, `.netrc`, endpoint tokens, or provider credential helpers.
 
+## Provider Validation
+
+Run isolated smoke checks against mounted or synchronized provider folders:
+
+```bash
+DOTWEAVER_REAL_ICLOUD_ROOT="$HOME/Library/Mobile Documents/com~apple~CloudDocs/DotWeaverSmoke" \
+DOTWEAVER_REAL_ONEDRIVE_ROOT="$HOME/Library/CloudStorage/OneDrive-Personal/DotWeaverSmoke" \
+DOTWEAVER_REAL_GOOGLEDRIVE_ROOT="$HOME/Library/CloudStorage/GoogleDrive-example@gmail.com/My Drive/DotWeaverSmoke" \
+script/smoke_real_provider_folders.sh
+```
+
+Run live Native Protocol checks when endpoints and credentials are configured outside DotWeaver:
+
+```bash
+DOTWEAVER_NATIVE_WEBDAV_ENDPOINT=https://example.com/webdav/dotweaver/ \
+DOTWEAVER_NATIVE_SFTP_ENDPOINT=sftp://example.com/dotweaver/ \
+DOTWEAVER_NATIVE_FTPS_ENDPOINT=ftps://example.com/dotweaver/ \
+DOTWEAVER_NATIVE_S3_ENDPOINT=https://s3.example.com/bucket/dotweaver/ \
+script/smoke_native_protocol_endpoints.sh
+```
+
 ## Security Notes
 
 - Files marked as vaulted are encrypted before provider storage.
