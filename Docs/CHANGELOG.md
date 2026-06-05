@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Status bar menu for quick actions
 - Onboarding flow with permission explanations
 - Comprehensive test suite (unit + integration)
-- GitHub Actions CI/CD with automated builds, tests, and notarization
+- GitHub Actions CI/CD with automated builds, tests, releases, and notarization support
 - Sparkle framework for automatic updates
 - Security-scoped bookmarks for GUI-selected files and provider folders
 
@@ -85,7 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Optional Secure Enclave wrapping for the vault master key, with Keychain fallback on unsupported hardware.
 - End-to-end Git provider test using a temporary bare remote repository.
-- Sparkle dependency, app bundle metadata, universal release packaging, notarization workflow, and appcast generation scripts.
+- Sparkle dependency, app bundle metadata, universal release packaging, optional notarization workflow, and appcast generation scripts.
 
 ### Planned for v1.1.0
 - Passkey authentication for provider login

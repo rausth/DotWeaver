@@ -1,7 +1,7 @@
 # DotWeaver - Next Steps
 
-**Date:** June 4, 2026
-**Status:** Functional release candidate. Core app, CLI, sync, security hardening, Sparkle packaging, and local release artifact generation are implemented.
+**Date:** June 5, 2026
+**Status:** v1.0.0 is released on GitHub. Core app, CLI, sync, security hardening, Sparkle packaging, hosted appcast validation, and website are implemented.
 
 ## Complete
 
@@ -31,6 +31,9 @@
 - App launch smoke script with optional Accessibility check
 - Local release/appcast validation script
 - Hosted Sparkle appcast/release asset validation script and release workflow step
+- Hosted v1.0.0 release with signed Sparkle appcast
+- DotWeaver app icon integrated into the app sidebar, onboarding, menu bar extra, and release package resource bundle
+- Dark professional website on GitHub Pages
 - Mackup config import and basic chezmoi source import/export in CLI
 - Regression tests for provider permissions, native credential rejection, shared provider restore, and interop parsing
 
@@ -57,8 +60,7 @@ Native Protocol mode uses system `curl`; embedded SDK/native-library clients are
 
 | Task | Priority | Status |
 |------|----------|--------|
-| Live notarization with Apple Developer credentials | High | Pending external credentials |
-| Live hosted Sparkle run with real signed appcast | Medium | Automation implemented; pending hosted release + Sparkle private key |
+| Live notarization with Apple Developer credentials | High | Pending `MACOS_CERTIFICATE_P12_BASE64`, `MACOS_CERTIFICATE_PASSWORD`, `DEVELOPER_ID_APPLICATION`, `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_SPECIFIC_PASSWORD` |
 | External security audit | Medium | Optional before public distribution |
 | Full Mackup application preset catalog | Medium | Optional v1.x growth work |
 | Advanced chezmoi template/script compatibility | Medium | Optional v1.x growth work |
@@ -73,6 +75,7 @@ swift test
 script/smoke_provider_matrix.sh
 script/validate_release_local.sh
 script/smoke_app_ui.sh
+APPCAST_URL=https://github.com/rausth/DotWeaver/releases/download/v1.0.0/appcast.xml REQUIRE_SPARKLE_SIGNATURE=1 script/validate_hosted_sparkle.sh
 ```
 
 Expected result: tests pass, release artifacts are generated, app signature verifies.

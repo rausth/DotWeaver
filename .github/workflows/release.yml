@@ -43,10 +43,19 @@ jobs:
           security import "$RUNNER_TEMP/developer-id.p12" -k build.keychain -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$RUNNER_TEMP" build.keychain
 
+      - name: Report notarization mode
+        run: |
+          set -euo pipefail
+          if [[ "$NOTARIZE" == "1" ]]; then
+            echo "Developer ID signing and Apple notarization enabled."
+          else
+            echo "Developer ID signing and Apple notarization skipped because Apple Developer secrets are not configured."
+          fi
+
       - name: Test
         run: swift test
 
-      - name: Package, sign, notarize, and staple
+      - name: Package app and CLI artifacts
         run: script/package_release.sh
 
       - name: Generate appcast

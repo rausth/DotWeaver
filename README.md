@@ -2,7 +2,7 @@
 
 DotWeaver is a native macOS dotfiles manager for synchronizing development configuration across machines. It combines a SwiftUI menu bar app, a full `dw` command-line interface, provider-backed storage, encrypted secret handling, snapshots, conflict resolution, and release packaging with Sparkle support.
 
-Current status: **v1.0.0 release candidate**. Core app, CLI, sync providers, security hardening, local release packaging, and appcast generation are implemented.
+Current status: **v1.0.0 released on GitHub**. Core app, CLI, sync providers, security hardening, local release packaging, signed Sparkle appcast generation, hosted Sparkle validation, and GitHub Pages website are implemented.
 
 ## Requirements
 
@@ -193,13 +193,14 @@ See [Notarization](Docs/wiki/Notarization.md) and [Release Process](Docs/wiki/Re
 
 ## Verification Baseline
 
-Current baseline used for release-candidate verification:
+Current baseline used for release verification:
 
 ```bash
 swift test
 script/smoke_provider_matrix.sh
 script/validate_release_local.sh
 script/smoke_app_ui.sh
+APPCAST_URL=https://github.com/rausth/DotWeaver/releases/download/v1.0.0/appcast.xml REQUIRE_SPARKLE_SIGNATURE=1 script/validate_hosted_sparkle.sh
 ```
 
 Expected result: tests pass, all providers pass isolated smoke validation, release artifacts are generated, app signature verifies, appcast validates, checksums match, and the app launches.
