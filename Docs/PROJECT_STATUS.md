@@ -1,6 +1,6 @@
 # DotWeaver Project Status
 
-**Date:** June 4, 2026
+**Date:** June 5, 2026
 **Version:** 1.0.0 candidate
 **Status:** Functional release candidate; live notarization is excluded from local implementation and still requires Apple Developer credentials.
 
@@ -22,6 +22,7 @@
 | Hook policy | Implemented | Hooks disabled by default; audited when skipped/executed |
 | Tests | Passing | Unit/integration tests cover core provider, vault, snapshot, native endpoint safety, Git remote behavior, provider permissions, shared restore, and interop parsing |
 | Release packaging | Implemented | Universal app/CLI artifacts, Sparkle framework embedding, appcast generation, local signature/rpath verification |
+| Sparkle signing | Configured | GitHub Actions secrets are configured for `SPARKLE_PUBLIC_ED_KEY` and `SPARKLE_PRIVATE_KEY`; local signed-appcast validation passes |
 | Smoke validation | Implemented | Provider matrix, app launch, local appcast, hosted Sparkle appcast, signature, rpath, checksum, and CLI help validators |
 | Native remote protocol clients | Implemented | WebDAV/SFTP/FTPS/S3 endpoint transfer via system `curl`; embedded SDK clients are not included |
 
@@ -44,7 +45,8 @@ For cloud and remote-style providers, synchronization to the remote service is h
 - Native Protocol mode depends on system `curl` and user-provided credential setup.
 - Mackup/chezmoi interop covers common import/export paths; full preset catalogs and advanced template/script semantics remain v1.x growth work.
 - Secure Enclave wrapping is opportunistic: supported hardware uses Secure Enclave wrapping; unsupported hardware falls back to Keychain-only storage.
-- Live notarization requires Apple Developer credentials. Live hosted Sparkle validation requires Sparkle signing key and hosted release assets.
+- Live notarization requires Apple Developer credentials and is intentionally excluded from this scope.
+- Live hosted Sparkle validation still requires a tag/release run with hosted assets; Sparkle signing secrets are configured.
 
 ## Last Verified
 
@@ -53,6 +55,7 @@ swift test
 script/smoke_provider_matrix.sh
 script/validate_release_local.sh
 script/smoke_app_ui.sh
+script/smoke_real_provider_folders.sh
 ```
 
 Result: passing.

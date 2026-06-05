@@ -25,6 +25,7 @@ APP_PID=$!
 cleanup() {
   if kill -0 "$APP_PID" >/dev/null 2>&1; then
     kill "$APP_PID" >/dev/null 2>&1 || true
+    wait "$APP_PID" >/dev/null 2>&1 || true
   fi
 }
 trap cleanup EXIT
@@ -44,7 +45,7 @@ fi
 "$CLI_BIN" --help | grep -q 'DotWeaver CLI'
 
 if [[ "${DOTWEAVER_ENABLE_AX_UI_TEST:-0}" == "1" ]]; then
-  osascript <<'APPLESCRIPT'
+  if ! osascript <<'APPLESCRIPT'
 tell application "System Events"
   repeat 30 times
     if exists process "DotWeaver" then return
@@ -53,6 +54,10 @@ tell application "System Events"
   error "DotWeaver process not visible to System Events"
 end tell
 APPLESCRIPT
+  then
+    echo "AX UI smoke failed. Grant Accessibility/Automation permission for this terminal or Codex host, then retry with DOTWEAVER_ENABLE_AX_UI_TEST=1." >&2
+    exit 1
+  fi
 fi
 
 echo "App launch smoke passed: $ROOT"

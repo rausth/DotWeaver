@@ -11,7 +11,7 @@ git push origin v1.0.0
 
 The workflow can also run manually with `workflow_dispatch`.
 
-If Apple signing secrets are absent, the workflow builds ad-hoc signed release artifacts and skips notarization. If Sparkle private-key secret is absent, the workflow generates an unsigned appcast and validates hosted delivery without requiring `sparkle:edSignature`.
+If Apple signing secrets are absent, the workflow builds ad-hoc signed release artifacts and skips notarization. Sparkle signing uses `SPARKLE_PUBLIC_ED_KEY` and `SPARKLE_PRIVATE_KEY` GitHub Actions secrets.
 
 ## Workflow
 
@@ -58,6 +58,16 @@ script/generate_sparkle_keys.sh
 script/generate_sparkle_keys.sh /tmp/dotweaver-sparkle-private-key.txt
 ```
 
+If the Sparkle Keychain-backed generator cannot run in an automation host, generate a CI keypair without storing anything in the login keychain:
+
+```bash
+script/generate_sparkle_ci_keys.sh /tmp/dotweaver-sparkle-private-key.txt
+gh secret set SPARKLE_PUBLIC_ED_KEY --body "<printed-public-key>"
+gh secret set SPARKLE_PRIVATE_KEY < /tmp/dotweaver-sparkle-private-key.txt
+```
+
+Do not commit the private key file.
+
 ## Hosted Validation
 
 After release assets are uploaded:
@@ -79,4 +89,4 @@ Validation checks:
 
 The release workflow runs this check after publishing assets.
 
-For production distribution, configure all Apple notarization secrets and both Sparkle key secrets before tagging the release.
+For production distribution, configure both Sparkle key secrets before tagging the release. Apple notarization secrets are separate and only needed when notarization is in scope.
