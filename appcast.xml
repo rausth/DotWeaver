@@ -13,8 +13,8 @@
       <description><![CDATA[
         <p>See GitHub release notes for changes.</p>
       ]]></description>
-      <pubDate>Sun, 07 Jun 2026 13:25:59 +0000</pubDate>
-      <enclosure url="https://github.com/rausth/DotWeaver/releases/download/v1.0.0/DotWeaver-1.0.0-macOS-universal.zip" sparkle:version="1" sparkle:shortVersionString="1.0.0" length="4316468" type="application/octet-stream" />
+      <pubDate>Sun, 07 Jun 2026 13:29:40 +0000</pubDate>
+      <enclosure url="https://github.com/rausth/DotWeaver/releases/download/v1.0.0/DotWeaver-1.0.0-macOS-universal.zip" sparkle:version="1" sparkle:shortVersionString="1.0.0" length="4315742" type="application/octet-stream" />
     </item>
   </channel>
 </rss>
