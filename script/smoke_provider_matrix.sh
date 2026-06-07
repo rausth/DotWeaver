@@ -33,9 +33,26 @@ assert_file_contains() {
 
 assert_provider_layout() {
   local provider_root="$1"
-  test -d "$provider_root/.dotweaver/files"
+  test -d "$provider_root/.dotweaver/files/machines"
   test -d "$provider_root/.dotweaver/manifests"
   test -d "$provider_root/.dotweaver/versions"
+}
+
+assert_any_file_under_contains() {
+  local root="$1"
+  local expected="$2"
+  local found=0
+  while IFS= read -r -d '' file; do
+    if grep -q "$expected" "$file"; then
+      found=1
+      break
+    fi
+  done < <(find "$root" -type f -print0)
+
+  if [[ "$found" != "1" ]]; then
+    echo "No file under $root contains expected text: $expected" >&2
+    exit 1
+  fi
 }
 
 smoke_folder_provider() {
@@ -60,7 +77,7 @@ smoke_folder_provider() {
   run_dw versions "$local_file" >/dev/null
 
   assert_provider_layout "$provider_root"
-  assert_file_contains "$provider_root/.dotweaver/manifests/files.json" "$provider"
+  assert_any_file_under_contains "$provider_root/.dotweaver/manifests/files" "$provider"
   test -d "$provider_root/.dotweaver/snapshots"
 }
 
