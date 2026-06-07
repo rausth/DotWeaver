@@ -64,7 +64,7 @@ enum DotWeaverAssets {
             return image
         }
 
-        guard let url = Bundle.module.url(forResource: "dotweaver-icon", withExtension: "png") else {
+        guard let url = DotWeaverResourceBundle.url(forResource: "dotweaver-icon", withExtension: "png") else {
             return nil
         }
 
@@ -73,7 +73,7 @@ enum DotWeaverAssets {
 
     static func menuBarIcon() -> NSImage? {
         let image = NSImage(named: "dotweaver-menubar-icon") ??
-            Bundle.module.url(forResource: "dotweaver-menubar-icon", withExtension: "png")
+            DotWeaverResourceBundle.url(forResource: "dotweaver-menubar-icon", withExtension: "png")
                 .flatMap(NSImage.init(contentsOf:))
 
         guard let image = image?.copy() as? NSImage else {
