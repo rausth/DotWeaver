@@ -2,7 +2,6 @@
 
 DotWeaver is a native macOS dotfiles manager for synchronizing development configuration across machines. It combines a SwiftUI menu bar app, a full `dw` command-line interface, provider-backed storage, encrypted secret handling, snapshots, conflict resolution, and release packaging with Sparkle support.
 
-Current status: **v1.0.0 released on GitHub**. Core app, CLI, sync providers, security hardening, local release packaging, signed Sparkle appcast generation, hosted Sparkle validation, and GitHub Pages website are implemented.
 
 ## Requirements
 
