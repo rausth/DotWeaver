@@ -6,6 +6,7 @@ struct DotWeaver: App {
     @StateObject private var viewModel = DotfilesViewModel()
     @StateObject private var updateManager = UpdateManager.shared
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     
     var body: some Scene {
@@ -25,6 +26,7 @@ struct DotWeaver: App {
                     }
             } else {
                 OnboardingView()
+                    .environmentObject(viewModel)
                     .preferredColorScheme(.dark)
             }
         }
@@ -68,7 +70,9 @@ struct DotWeaver: App {
             
             #if os(macOS)
             Button("Settings...") {
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                NSApp.setActivationPolicy(.regular)
+                openSettings()
+                NSApp.activate(ignoringOtherApps: true)
             }
             #endif
             
