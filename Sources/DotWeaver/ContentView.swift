@@ -57,7 +57,11 @@ enum DotWeaverAssets {
     }
 
     static func menuBarIcon() -> NSImage? {
-        guard let image = brandIcon()?.copy() as? NSImage else {
+        let image = NSImage(named: "dotweaver-menubar-icon") ??
+            Bundle.module.url(forResource: "dotweaver-menubar-icon", withExtension: "png")
+                .flatMap(NSImage.init(contentsOf:))
+
+        guard let image = image?.copy() as? NSImage else {
             return nil
         }
 
