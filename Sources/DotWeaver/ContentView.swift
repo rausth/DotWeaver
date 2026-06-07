@@ -55,6 +55,16 @@ enum DotWeaverAssets {
 
         return NSImage(contentsOf: url)
     }
+
+    static func menuBarIcon() -> NSImage? {
+        guard let image = brandIcon()?.copy() as? NSImage else {
+            return nil
+        }
+
+        image.size = NSSize(width: 18, height: 18)
+        image.isTemplate = true
+        return image
+    }
 }
 
 struct DotWeaverBrandIcon: View {

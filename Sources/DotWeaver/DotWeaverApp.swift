@@ -78,10 +78,14 @@ struct DotWeaver: App {
                 NSApplication.shared.terminate(nil)
             }
         } label: {
-            if let image = DotWeaverAssets.brandIcon() {
+            if let image = DotWeaverAssets.menuBarIcon() {
                 Image(nsImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 18, height: 18)
+                    .accessibilityLabel("DotWeaver")
             } else {
-                Image(systemName: "doc.text.magnifyingglass")
+                Label("DotWeaver", systemImage: "doc.text.magnifyingglass")
             }
         }
         
