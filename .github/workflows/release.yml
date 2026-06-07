@@ -69,7 +69,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            dist/artifacts/DotWeaver-*-macOS-universal.zip
+            dist/artifacts/DotWeaver-*-macOS-*.zip
             dist/artifacts/dw-*-macOS-universal.tar.gz
             dist/artifacts/SHA256SUMS.txt
             appcast.xml

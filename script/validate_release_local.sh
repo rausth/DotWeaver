@@ -9,21 +9,35 @@ script/generate_appcast.sh
 APP="dist/release/DotWeaver.app"
 APP_BIN="$APP/Contents/MacOS/DotWeaver"
 CLI_BIN="$APP/Contents/MacOS/dw"
-APP_ZIP="$(find dist/artifacts -name 'DotWeaver-*-macOS-universal.zip' -maxdepth 1 -type f | head -n 1)"
-CLI_TAR="$(find dist/artifacts -name 'dw-*-macOS-universal.tar.gz' -maxdepth 1 -type f | head -n 1)"
+APP_ZIP="$(find dist/artifacts -maxdepth 1 -type f -name 'DotWeaver-*-macOS-universal.zip' -print -quit)"
+APP_ARM_ZIP="$(find dist/artifacts -maxdepth 1 -type f -name 'DotWeaver-*-macOS-arm64.zip' -print -quit)"
+APP_X86_ZIP="$(find dist/artifacts -maxdepth 1 -type f -name 'DotWeaver-*-macOS-x86_64.zip' -print -quit)"
+CLI_TAR="$(find dist/artifacts -maxdepth 1 -type f -name 'dw-*-macOS-universal.tar.gz' -print -quit)"
 
 test -d "$APP"
 test -x "$APP_BIN"
 test -x "$CLI_BIN"
 test -f "$APP_ZIP"
+test -f "$APP_ARM_ZIP"
+test -f "$APP_X86_ZIP"
 test -f "$CLI_TAR"
 test -f dist/artifacts/SHA256SUMS.txt
 test -f appcast.xml
 
 codesign --verify --deep --strict --verbose=2 "$APP"
-otool -l "$APP_BIN" | grep -q '@executable_path/../Frameworks'
-"$CLI_BIN" --help | grep -q 'DotWeaver CLI'
-plutil -extract SUFeedURL raw "$APP/Contents/Info.plist" | grep -q '^https://github.com/.*/releases/latest/download/appcast.xml$'
+unzip -q -o "$APP_ARM_ZIP" -d dist/validate-arm64
+unzip -q -o "$APP_X86_ZIP" -d dist/validate-x86_64
+ARM_APP_BIN="$(find dist/validate-arm64 -type f -path '*/DotWeaver.app/Contents/MacOS/DotWeaver' -print -quit)"
+ARM_SPARKLE_BIN="$(find dist/validate-arm64 -type f -path '*/DotWeaver.app/Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle' -print -quit)"
+X86_APP_BIN="$(find dist/validate-x86_64 -type f -path '*/DotWeaver.app/Contents/MacOS/DotWeaver' -print -quit)"
+X86_SPARKLE_BIN="$(find dist/validate-x86_64 -type f -path '*/DotWeaver.app/Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle' -print -quit)"
+[[ "$(lipo -archs "$ARM_APP_BIN")" == "arm64" ]]
+[[ "$(lipo -archs "$ARM_SPARKLE_BIN")" == "arm64" ]]
+[[ "$(lipo -archs "$X86_APP_BIN")" == "x86_64" ]]
+[[ "$(lipo -archs "$X86_SPARKLE_BIN")" == "x86_64" ]]
+[[ "$(otool -l "$APP_BIN")" == *"@executable_path/../Frameworks"* ]]
+[[ "$("$CLI_BIN" --help)" == *"DotWeaver CLI"* ]]
+[[ "$(plutil -extract SUFeedURL raw -o - "$APP/Contents/Info.plist")" == https://github.com/*/releases/latest/download/appcast.xml ]]
 shasum -a 256 -c dist/artifacts/SHA256SUMS.txt
 
 python3 - <<'PY'

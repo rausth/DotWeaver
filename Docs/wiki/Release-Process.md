@@ -26,6 +26,8 @@ If Apple signing secrets are absent, the workflow builds ad-hoc signed release a
 
 ```text
 DotWeaver-<version>-macOS-universal.zip
+DotWeaver-<version>-macOS-arm64.zip
+DotWeaver-<version>-macOS-x86_64.zip
 dw-<version>-macOS-universal.tar.gz
 SHA256SUMS.txt
 appcast.xml

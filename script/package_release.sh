@@ -61,7 +61,7 @@ cp AppIcon.icns "${RESOURCES_DIR}/AppIcon.icns"
 
 copy_sparkle_framework() {
   local framework
-  framework="$(find .build -path '*/Sparkle.framework' -type d | head -n 1 || true)"
+  framework="$(find .build -type d -path '*/Sparkle.framework' -print -quit || true)"
   if [[ -z "$framework" ]]; then
     echo "Sparkle.framework not found under .build" >&2
     return 1
@@ -152,21 +152,72 @@ sign_path() {
   fi
 }
 
-echo "Sign app"
-if [[ -n "$SIGN_IDENTITY" ]]; then
-  find "${FRAMEWORKS_DIR}" -type f -perm -111 -print0 | while IFS= read -r -d '' executable; do
-    sign_path "$executable" || true
-  done
-  find "${FRAMEWORKS_DIR}" -name '*.framework' -type d -maxdepth 2 -print0 | while IFS= read -r -d '' framework; do
-    sign_path "$framework"
-  done
-  sign_path "${MACOS_DIR}/dw"
-  sign_path "$APP_DIR"
-else
-  sign_path "$APP_DIR"
-fi
+sign_app_bundle() {
+  local app_dir="$1"
+  local app_macos_dir="${app_dir}/Contents/MacOS"
+  local app_frameworks_dir="${app_dir}/Contents/Frameworks"
 
-codesign --verify --deep --strict --verbose=2 "$APP_DIR"
+  if [[ -n "$SIGN_IDENTITY" ]]; then
+    find "${app_frameworks_dir}" -type f -perm -111 -print0 | while IFS= read -r -d '' executable; do
+      sign_path "$executable" || true
+    done
+    find "${app_frameworks_dir}" -name '*.framework' -type d -maxdepth 2 -print0 | while IFS= read -r -d '' framework; do
+      sign_path "$framework"
+    done
+    sign_path "${app_macos_dir}/dw"
+    sign_path "$app_dir"
+  else
+    sign_path "$app_dir"
+  fi
+
+  codesign --verify --deep --strict --verbose=2 "$app_dir"
+}
+
+thin_macho_files() {
+  local app_dir="$1"
+  local arch="$2"
+
+  find "$app_dir" -type f -print0 | while IFS= read -r -d '' file; do
+    local archs
+    if ! archs="$(lipo -archs "$file" 2>/dev/null)"; then
+      continue
+    fi
+    if [[ " ${archs} " != *" ${arch} "* ]]; then
+      echo "Missing ${arch} slice: $file (${archs})" >&2
+      exit 1
+    fi
+    if [[ "$archs" == "$arch" ]]; then
+      continue
+    fi
+
+    local mode
+    local tmp
+    if ! mode="$(stat -f '%Lp' "$file" 2>/dev/null)"; then
+      mode="$(stat -c '%a' "$file")"
+    fi
+    tmp="${file}.thin"
+    lipo "$file" -thin "$arch" -output "$tmp"
+    chmod "$mode" "$tmp"
+    mv "$tmp" "$file"
+  done
+}
+
+create_arch_app_zip() {
+  local arch="$1"
+  local arch_release_dir="${RELEASE_DIR}/${arch}"
+  local arch_app_dir="${arch_release_dir}/${BUNDLE_NAME}"
+  local arch_zip="${ARTIFACTS_DIR}/DotWeaver-${VERSION}-macOS-${arch}.zip"
+
+  rm -rf "$arch_release_dir"
+  mkdir -p "$arch_release_dir"
+  ditto "$APP_DIR" "$arch_app_dir"
+  thin_macho_files "$arch_app_dir" "$arch"
+  sign_app_bundle "$arch_app_dir"
+  ditto -c -k --keepParent "$arch_app_dir" "$arch_zip"
+}
+
+echo "Sign app"
+sign_app_bundle "$APP_DIR"
 
 APP_ZIP="${ARTIFACTS_DIR}/DotWeaver-${VERSION}-macOS-universal.zip"
 CLI_TAR="${ARTIFACTS_DIR}/dw-${VERSION}-macOS-universal.tar.gz"
@@ -199,10 +250,13 @@ if [[ "$NOTARIZE" == "1" ]]; then
   ditto -c -k --keepParent "$APP_DIR" "$APP_ZIP"
 fi
 
-shasum -a 256 "$APP_ZIP" "$CLI_TAR" > "${ARTIFACTS_DIR}/SHA256SUMS.txt"
+create_arch_app_zip "arm64"
+create_arch_app_zip "x86_64"
+
+shasum -a 256 "${ARTIFACTS_DIR}"/DotWeaver-"${VERSION}"-macOS-*.zip "$CLI_TAR" > "${ARTIFACTS_DIR}/SHA256SUMS.txt"
 
 echo "Artifacts:"
-echo "  $APP_ZIP"
+find "$ARTIFACTS_DIR" -maxdepth 1 -name "DotWeaver-${VERSION}-macOS-*.zip" -print | sort | sed 's/^/  /'
 echo "  $CLI_TAR"
 echo "  ${ARTIFACTS_DIR}/SHA256SUMS.txt"
 

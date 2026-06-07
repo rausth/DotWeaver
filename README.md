@@ -24,7 +24,7 @@ DotWeaver is a native macOS dotfiles manager for synchronizing development confi
 - Biometric/device-owner gates for vaulted sync, snapshot restore, and credential reads
 - Security-scoped bookmarks for GUI-selected files and provider folders
 - Hook policy disabled by default, audited when skipped or executed
-- Sparkle framework integration, appcast generation, and universal app/CLI packaging
+- Sparkle framework integration, appcast generation, split app archives, and universal CLI packaging
 
 ## Provider Model
 
@@ -154,7 +154,7 @@ See [Security Policy](Docs/SECURITY.md) and [Security Audit Notes](Docs/SECURITY
 
 ## Release Packaging
 
-Create local universal app and CLI artifacts:
+Create local app and CLI artifacts:
 
 ```bash
 script/package_release.sh --local
@@ -166,6 +166,8 @@ Generated outputs:
 ```text
 dist/release/DotWeaver.app
 dist/artifacts/DotWeaver-1.0.0-macOS-universal.zip
+dist/artifacts/DotWeaver-1.0.0-macOS-arm64.zip
+dist/artifacts/DotWeaver-1.0.0-macOS-x86_64.zip
 dist/artifacts/dw-1.0.0-macOS-universal.tar.gz
 dist/artifacts/SHA256SUMS.txt
 appcast.xml
