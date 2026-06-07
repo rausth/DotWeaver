@@ -81,6 +81,7 @@ struct DotWeaver: App {
             if let image = DotWeaverAssets.menuBarIcon() {
                 Image(nsImage: image)
                     .resizable()
+                    .renderingMode(.original)
                     .scaledToFit()
                     .frame(width: 18, height: 18)
                     .accessibilityLabel("DotWeaver")
