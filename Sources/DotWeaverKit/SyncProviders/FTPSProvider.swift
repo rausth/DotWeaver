@@ -37,6 +37,10 @@ final class FTPSProvider: SyncProviderProtocol {
         try await selectedProvider().status()
     }
 
+    func listMachines() async throws -> [MachineIdentity] {
+        try await selectedProvider().listMachines()
+    }
+
     private func selectedProvider() -> SyncProviderProtocol {
         modeProvider() == .native ? nativeProvider : folderProvider
     }

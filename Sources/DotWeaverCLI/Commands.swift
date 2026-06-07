@@ -566,8 +566,8 @@ private func runConfiguredGit(_ arguments: [String]) throws -> String {
 }
 
 private func stageAndCommitConfiguredGitIfNeeded() throws {
-    _ = try runConfiguredGit(["add", SyncStoragePaths.namespace])
-    let status = try runConfiguredGit(["status", "--porcelain", SyncStoragePaths.namespace])
+    _ = try runConfiguredGit(["add", ".dotweaver"])
+    let status = try runConfiguredGit(["status", "--porcelain", ".dotweaver"])
     guard !status.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
         return
     }

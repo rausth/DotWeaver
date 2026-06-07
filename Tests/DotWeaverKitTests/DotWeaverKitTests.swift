@@ -64,25 +64,65 @@ final class DotWeaverKitTests: XCTestCase {
     }
 
     @MainActor
-    func testSharedProviderNamespaceRestoresSameTargetPathAcrossMachines() async throws {
+    func testSelectedMachineNamespaceRestoresSameTargetPathAcrossMachines() async throws {
         let tempRoot = try makeTemporaryDirectory()
         let storageRoot = tempRoot.appendingPathComponent("SharedOneDrive")
         let localFile = tempRoot.appendingPathComponent(".config/tool/settings.toml")
         let dotfile = Dotfile(path: localFile.path)
+        let sourceMachineID = "machine-a"
 
         try FileManager.default.createDirectory(at: localFile.deletingLastPathComponent(), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: storageRoot, withIntermediateDirectories: true)
-        try "machine = \"A\"\n".write(to: localFile, atomically: true, encoding: .utf8)
 
-        let providerA = OneDriveProvider(storageRootProvider: { storageRoot.path })
-        _ = try await providerA.syncBidirectional(dotfiles: [dotfile])
+        let sourceRemoteURL = SyncStoragePaths.remoteFileURL(
+            forLocalFile: localFile,
+            storageRoot: storageRoot,
+            machineID: sourceMachineID
+        )
+        try FileManager.default.createDirectory(at: sourceRemoteURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "machine = \"A\"\n".write(to: sourceRemoteURL, atomically: true, encoding: .utf8)
 
-        try FileManager.default.removeItem(at: localFile)
-
-        let providerB = OneDriveProvider(storageRootProvider: { storageRoot.path })
+        let providerB = FolderSyncProvider(
+            name: .onedrive,
+            storageRootProvider: { storageRoot.path },
+            sourceMachineIDProvider: { sourceMachineID }
+        )
         _ = try await providerB.syncBidirectional(dotfiles: [dotfile])
 
         XCTAssertEqual(try String(contentsOf: localFile, encoding: .utf8), "machine = \"A\"\n")
+
+        let currentMachineID = try MachineIdentity.current().id
+        let currentRemoteURL = SyncStoragePaths.remoteFileURL(
+            forLocalFile: localFile,
+            storageRoot: storageRoot,
+            machineID: currentMachineID
+        )
+        XCTAssertEqual(try String(contentsOf: currentRemoteURL, encoding: .utf8), "machine = \"A\"\n")
+        XCTAssertNotEqual(currentRemoteURL.path, sourceRemoteURL.path)
+    }
+
+    @MainActor
+    func testFolderProviderListsMachineManifests() async throws {
+        let tempRoot = try makeTemporaryDirectory()
+        let storageRoot = tempRoot.appendingPathComponent("Provider")
+        let machinesRoot = storageRoot.appendingPathComponent(".dotweaver/manifests/machines")
+        try FileManager.default.createDirectory(at: machinesRoot, withIntermediateDirectories: true)
+
+        let remoteMachine = MachineIdentity(
+            id: "remote-machine",
+            hostname: "studio-intel",
+            userName: "rausth",
+            osVersion: "macOS 15",
+            architecture: "x86_64",
+            createdAt: Date()
+        )
+        try JSONEncoder.pretty.encode(remoteMachine)
+            .write(to: machinesRoot.appendingPathComponent("remote-machine.json"), options: .atomic)
+
+        let provider = FolderSyncProvider(name: .onedrive, storageRootProvider: { storageRoot.path })
+        let machines = try await provider.listMachines()
+
+        XCTAssertTrue(machines.contains(where: { $0.id == "remote-machine" && $0.hostname == "studio-intel" }))
     }
 
     @MainActor

@@ -4,40 +4,50 @@ final class NativeProtocolProvider: SyncProviderProtocol {
     let name: SyncProvider
 
     private let configProvider: () -> NativeProviderConfig
+    private let sourceMachineIDProvider: () -> String
 
-    init(name: SyncProvider, configProvider: @escaping () -> NativeProviderConfig) {
+    init(
+        name: SyncProvider,
+        configProvider: @escaping () -> NativeProviderConfig,
+        sourceMachineIDProvider: @escaping () -> String = { StateManager.loadState().selectedSyncMachineID }
+    ) {
         self.name = name
         self.configProvider = configProvider
+        self.sourceMachineIDProvider = sourceMachineIDProvider
     }
 
     func syncBidirectional(dotfiles: [Dotfile]) async throws -> [Dotfile] {
         let config = try resolvedConfig()
+        let currentMachineID = try MachineIdentity.current().id
+        let sourceMachineID = resolvedSourceMachineID(currentMachineID: currentMachineID)
         var updated = dotfiles
 
         for index in updated.indices {
             var dotfile = updated[index]
             let localURL = URL(fileURLWithPath: (dotfile.path as NSString).expandingTildeInPath)
             try SyncPathSecurity.validateLocalFile(localURL)
-            let remoteURL = remoteFileURL(for: localURL, config: config)
+            let sourceRemoteURL = remoteFileURL(for: localURL, config: config, machineID: sourceMachineID)
+            let writeRemoteURL = remoteFileURL(for: localURL, config: config, machineID: currentMachineID)
             let localExists = FileManager.default.fileExists(atPath: localURL.path)
-            let remoteExists = try remoteFileExists(remoteURL, config: config)
+            let remoteExists = try remoteFileExists(sourceRemoteURL, config: config)
 
             do {
                 switch (localExists, remoteExists) {
                 case (true, false):
-                    try upload(localURL: localURL, remoteURL: remoteURL, dotfile: dotfile, config: config)
+                    try upload(localURL: localURL, remoteURL: writeRemoteURL, dotfile: dotfile, config: config)
                 case (false, true):
-                    try download(remoteURL: remoteURL, localURL: localURL, config: config)
+                    try download(remoteURL: sourceRemoteURL, localURL: localURL, config: config)
+                    try upload(localURL: localURL, remoteURL: writeRemoteURL, dotfile: dotfile, config: config)
                 case (false, false):
                     throw SyncError.fileNotFound(localURL.path)
                 case (true, true):
-                    try resolveExisting(dotfile: dotfile, localURL: localURL, remoteURL: remoteURL, config: config)
+                    try resolveExisting(dotfile: dotfile, localURL: localURL, sourceRemoteURL: sourceRemoteURL, writeRemoteURL: writeRemoteURL, config: config)
                 }
 
                 dotfile.status = .synced
                 dotfile.lastSynced = Date()
                 dotfile.lastLocalModified = modificationDate(at: localURL)
-                dotfile.lastRemoteModified = try remoteModificationDate(remoteURL, config: config)
+                dotfile.lastRemoteModified = try remoteModificationDate(sourceRemoteURL, config: config)
                 try writeNativeVersion(dotfile: dotfile, localURL: localURL)
                 updated[index] = dotfile
             } catch {
@@ -47,7 +57,15 @@ final class NativeProtocolProvider: SyncProviderProtocol {
             }
         }
 
-        SyncAuditLog.record("Synchronized native provider", metadata: ["provider": name.rawValue, "files": "\(updated.count)"])
+        SyncAuditLog.record(
+            "Synchronized native provider",
+            metadata: [
+                "provider": name.rawValue,
+                "files": "\(updated.count)",
+                "sourceMachine": sourceMachineID,
+                "currentMachine": currentMachineID
+            ]
+        )
         return updated
     }
 
@@ -67,21 +85,28 @@ final class NativeProtocolProvider: SyncProviderProtocol {
         []
     }
 
-    private func resolveExisting(dotfile: Dotfile, localURL: URL, remoteURL: URL, config: NativeProviderConfig) throws {
+    private func resolvedSourceMachineID(currentMachineID: String) -> String {
+        let selected = sourceMachineIDProvider().trimmingCharacters(in: .whitespacesAndNewlines)
+        return selected.isEmpty ? currentMachineID : selected
+    }
+
+    private func resolveExisting(dotfile: Dotfile, localURL: URL, sourceRemoteURL: URL, writeRemoteURL: URL, config: NativeProviderConfig) throws {
         switch dotfile.conflictStrategy {
         case .localWins:
-            try upload(localURL: localURL, remoteURL: remoteURL, dotfile: dotfile, config: config)
+            try upload(localURL: localURL, remoteURL: writeRemoteURL, dotfile: dotfile, config: config)
         case .remoteWins:
-            try download(remoteURL: remoteURL, localURL: localURL, config: config)
+            try download(remoteURL: sourceRemoteURL, localURL: localURL, config: config)
+            try upload(localURL: localURL, remoteURL: writeRemoteURL, dotfile: dotfile, config: config)
         case .manual:
             throw SyncError.conflictDetected([dotfile])
         case .lastModifiedWins:
             let localDate = modificationDate(at: localURL) ?? .distantPast
-            let remoteDate = try remoteModificationDate(remoteURL, config: config) ?? .distantPast
+            let remoteDate = try remoteModificationDate(sourceRemoteURL, config: config) ?? .distantPast
             if localDate >= remoteDate {
-                try upload(localURL: localURL, remoteURL: remoteURL, dotfile: dotfile, config: config)
+                try upload(localURL: localURL, remoteURL: writeRemoteURL, dotfile: dotfile, config: config)
             } else {
-                try download(remoteURL: remoteURL, localURL: localURL, config: config)
+                try download(remoteURL: sourceRemoteURL, localURL: localURL, config: config)
+                try upload(localURL: localURL, remoteURL: writeRemoteURL, dotfile: dotfile, config: config)
             }
         }
     }
@@ -149,10 +174,11 @@ final class NativeProtocolProvider: SyncProviderProtocol {
         return formatter.date(from: value)
     }
 
-    private func remoteFileURL(for localURL: URL, config: NativeProviderConfig) -> URL {
+    private func remoteFileURL(for localURL: URL, config: NativeProviderConfig, machineID: String) -> URL {
         let relativePath = SyncStoragePaths.relativeStoragePath(for: localURL)
         return config.normalizedEndpointURL()
-            .appendingPathComponent(".dotweaver/files")
+            .appendingPathComponent(SyncStoragePaths.machineFilesNamespace)
+            .appendingPathComponent(machineID)
             .appendingPathComponent(relativePath)
     }
 

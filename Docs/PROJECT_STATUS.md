@@ -31,7 +31,7 @@
 Managed files are stored under:
 
 ```text
-<provider folder>/.dotweaver/files/
+<provider folder>/.dotweaver/files/machines/<machine-id>/
 <provider folder>/.dotweaver/manifests/
 <provider folder>/.dotweaver/versions/
 <provider folder>/.dotweaver/snapshots/

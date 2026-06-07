@@ -58,9 +58,13 @@ final class GitProvider: SyncProviderProtocol {
         []
     }
 
+    func listMachines() async throws -> [MachineIdentity] {
+        try await folderProvider.listMachines()
+    }
+
     private func stageAndCommitIfNeeded() throws {
-        try runGit(["add", SyncStoragePaths.namespace])
-        let status = try runGit(["status", "--porcelain", SyncStoragePaths.namespace])
+        try runGit(["add", ".dotweaver"])
+        let status = try runGit(["status", "--porcelain", ".dotweaver"])
         guard !status.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return
         }

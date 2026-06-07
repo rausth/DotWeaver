@@ -31,7 +31,7 @@ DotWeaver is a native macOS dotfiles manager for synchronizing development confi
 DotWeaver stores managed data inside the selected provider root:
 
 ```text
-<provider folder>/.dotweaver/files/
+<provider folder>/.dotweaver/files/machines/<machine-id>/
 <provider folder>/.dotweaver/manifests/
 <provider folder>/.dotweaver/versions/
 <provider folder>/.dotweaver/snapshots/
@@ -45,7 +45,7 @@ Provider behavior:
 | iCloud, OneDrive, Google Drive, Dropbox | Desktop sync folder selected by user |
 | WebDAV, SFTP, FTPS, S3 | Mounted/synchronized folder or Native Protocol endpoint |
 
-Native Protocol mode delegates transfer to system `curl`. DotWeaver does not store native protocol passwords. Use SSH keys, `.netrc`, endpoint tokens, or provider credential helpers.
+Folder-backed providers keep each machine's files under its own machine namespace. In Settings, choose **Sync From** to restore from another machine while this Mac writes back into its own namespace. Native Protocol mode delegates transfer to system `curl`. DotWeaver does not store native protocol passwords. Use SSH keys, `.netrc`, endpoint tokens, or provider credential helpers.
 
 ## Build And Run
 

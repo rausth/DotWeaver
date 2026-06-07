@@ -62,7 +62,7 @@ Dotfiles are configuration files that start with a dot (`.`) and control the beh
 
 ### Synchronization
 DotWeaver supports two synchronization modes:
-- **Bidirectional folder sync**: Copy newer local or stored files between the home directory and `<provider folder>/.dotweaver/files/`
+- **Bidirectional folder sync**: Copy newer local or selected-machine stored files between the home directory and `<provider folder>/.dotweaver/files/machines/<machine-id>/`
 - **Git push/pull**: Use the configured local repository, remote URL, and branch
 
 ### Providers

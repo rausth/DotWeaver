@@ -3,7 +3,7 @@
 This guide covers current provider configuration. DotWeaver stores managed files under:
 
 ```text
-<provider folder>/.dotweaver/files/
+<provider folder>/.dotweaver/files/machines/<machine-id>/
 ```
 
 DotWeaver also writes:
@@ -13,6 +13,8 @@ DotWeaver also writes:
 <provider folder>/.dotweaver/versions/
 <provider folder>/.dotweaver/snapshots/
 ```
+
+Folder-backed providers keep each machine in its own namespace. Use Settings > Storage > Sync From to restore from a different machine while this Mac writes back to its own namespace.
 
 For non-Git providers, choose one transport:
 
@@ -26,7 +28,7 @@ For non-Git providers, choose one transport:
 3. Choose a local repository folder.
 4. Optional: configure remote URL and branch.
 
-DotWeaver writes managed files into `.dotweaver/files/` inside the repository. `push()` stages that folder, creates a sync commit when needed, and pushes to `origin <branch>`.
+DotWeaver writes managed files into `.dotweaver/files/machines/<machine-id>/` inside the repository. `push()` stages `.dotweaver`, creates a sync commit when needed, and pushes to `origin <branch>`.
 
 ## iCloud Drive
 

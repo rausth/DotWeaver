@@ -18,6 +18,8 @@ public final class DotfilesViewModel: ObservableObject {
     @Published public var gitHost: String = "GitHub" { didSet { save() } }
     @Published public var providerTransportModes: [SyncProvider: ProviderTransportMode] = [:] { didSet { save() } }
     @Published public var nativeProviderConfigs: [SyncProvider: NativeProviderConfig] = [:] { didSet { save() } }
+    @Published public var selectedSyncMachineID: String = "" { didSet { save() } }
+    @Published public var availableMachines: [MachineIdentity] = []
 
     private let providers: [SyncProvider: SyncProviderProtocol]
     private var watchers: [String: FileWatcher] = [:]
@@ -55,6 +57,7 @@ public final class DotfilesViewModel: ObservableObject {
             gitHost: gitHost,
             providerTransportModes: providerTransportModes,
             nativeProviderConfigs: nativeProviderConfigs,
+            selectedSyncMachineID: selectedSyncMachineID,
             securityScopedBookmarks: StateManager.loadState().securityScopedBookmarks
         )
         StateManager.saveState(state)
@@ -74,6 +77,8 @@ public final class DotfilesViewModel: ObservableObject {
         self.gitHost = state.gitHost
         self.providerTransportModes = state.providerTransportModes
         self.nativeProviderConfigs = state.nativeProviderConfigs
+        self.selectedSyncMachineID = state.selectedSyncMachineID
+        self.availableMachines = (try? [MachineIdentity.current()]) ?? []
         SecurityScopedBookmarks.restoreAccess()
         
         // Add a log entry for startup if it's not a fresh state
@@ -83,6 +88,43 @@ public final class DotfilesViewModel: ObservableObject {
        
         // Ensure watchers are active on load
         startWatchingDotfiles()
+    }
+
+    public var selectedSyncMachineLabel: String {
+        if selectedSyncMachineID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "This Mac"
+        }
+        return availableMachines.first(where: { $0.id == selectedSyncMachineID })?.hostname ?? "Selected Mac"
+    }
+
+    public func useThisMachineForSync() {
+        selectedSyncMachineID = ""
+    }
+
+    public func refreshAvailableMachines() async {
+        guard let provider = providers[selectedProvider] else {
+            availableMachines = (try? [MachineIdentity.current()]) ?? []
+            return
+        }
+
+        do {
+            let machines = try await provider.listMachines()
+            availableMachines = machines
+            let currentID = try MachineIdentity.current().id
+            let selected = selectedSyncMachineID.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !selected.isEmpty && !machines.contains(where: { $0.id == selected }) {
+                selectedSyncMachineID = ""
+            }
+            if !availableMachines.contains(where: { $0.id == currentID }),
+               let current = try? MachineIdentity.current() {
+                availableMachines.insert(current, at: 0)
+            }
+        } catch {
+            if let current = try? MachineIdentity.current() {
+                availableMachines = [current]
+            }
+            statusMessage = "Could not load machines: \(error.localizedDescription)"
+        }
     }
     
     public func syncBidirectional() async {
@@ -116,7 +158,8 @@ public final class DotfilesViewModel: ObservableObject {
             let updated = try await provider.syncBidirectional(dotfiles: dotfiles)
             self.dotfiles = updated
             statusMessage = "✅ Sync completed successfully"
-            addActivityLog(message: "Synchronized with \(selectedProvider.title)", type: .sync)
+            addActivityLog(message: "Synchronized with \(selectedProvider.title) from \(selectedSyncMachineLabel)", type: .sync)
+            await refreshAvailableMachines()
             
             // Execute post-sync hooks
             for dotfile in self.dotfiles {

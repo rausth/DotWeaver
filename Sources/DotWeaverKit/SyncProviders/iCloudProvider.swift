@@ -38,4 +38,8 @@ final class iCloudProvider: SyncProviderProtocol {
     func status() async throws -> [Dotfile] {
         try await provider.status()
     }
+
+    func listMachines() async throws -> [MachineIdentity] {
+        try await provider.listMachines()
+    }
 }

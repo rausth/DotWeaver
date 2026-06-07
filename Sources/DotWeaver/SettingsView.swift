@@ -76,12 +76,41 @@ struct SettingsView: View {
                         }
                     }
                     .pickerStyle(.menu)
+                    .onChange(of: viewModel.selectedProvider) { _, _ in
+                        Task { await viewModel.refreshAvailableMachines() }
+                    }
                     
                     Text("This provider will be used to store your managed dotfiles.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } header: {
                     Text("Primary Storage")
+                        .font(.headline)
+                }
+
+                Section {
+                    Picker("Sync From", selection: $viewModel.selectedSyncMachineID) {
+                        Text("This Mac").tag("")
+                        ForEach(remoteMachineChoices) { machine in
+                            Text(machineLabel(machine)).tag(machine.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    HStack {
+                        Text(machineHelpText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button {
+                            Task { await viewModel.refreshAvailableMachines() }
+                        } label: {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                } header: {
+                    Text("Machine Source")
                         .font(.headline)
                 }
                 
@@ -227,6 +256,9 @@ struct SettingsView: View {
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)
             .background(.ultraThinMaterial)
+            .task {
+                await viewModel.refreshAvailableMachines()
+            }
             .tabItem {
                 Label("Storage", systemImage: "externaldrive.fill")
             }
@@ -354,6 +386,25 @@ struct SettingsView: View {
                 viewModel.setNativeConfig(config, for: provider)
             }
         )
+    }
+
+    private var currentMachineID: String {
+        (try? MachineIdentity.current().id) ?? ""
+    }
+
+    private var remoteMachineChoices: [MachineIdentity] {
+        viewModel.availableMachines.filter { $0.id != currentMachineID }
+    }
+
+    private var machineHelpText: String {
+        if viewModel.selectedSyncMachineID.isEmpty {
+            return "Sync writes and reads this Mac's machine namespace."
+        }
+        return "Sync reads from the selected Mac and writes this Mac's namespace."
+    }
+
+    private func machineLabel(_ machine: MachineIdentity) -> String {
+        "\(machine.hostname) • \(machine.architecture)"
     }
     
     private func updateLoginItem(_ enabled: Bool) {

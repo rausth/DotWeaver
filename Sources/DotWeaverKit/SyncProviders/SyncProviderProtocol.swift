@@ -8,4 +8,11 @@ protocol SyncProviderProtocol {
     func pull() async throws
     func push() async throws
     func status() async throws -> [Dotfile]
+    func listMachines() async throws -> [MachineIdentity]
+}
+
+extension SyncProviderProtocol {
+    func listMachines() async throws -> [MachineIdentity] {
+        []
+    }
 }

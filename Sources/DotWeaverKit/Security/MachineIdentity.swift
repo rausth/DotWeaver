@@ -1,6 +1,6 @@
 import Foundation
 
-public struct MachineIdentity: Codable, Sendable {
+public struct MachineIdentity: Codable, Sendable, Identifiable, Hashable {
     public let id: String
     public let hostname: String
     public let userName: String
@@ -11,7 +11,7 @@ public struct MachineIdentity: Codable, Sendable {
     public static func current() throws -> MachineIdentity {
         let url = identityURL()
         if let data = try? Data(contentsOf: url),
-           let identity = try? JSONDecoder().decode(MachineIdentity.self, from: data) {
+           let identity = try? JSONDecoder.dotWeaver.decode(MachineIdentity.self, from: data) {
             return identity
         }
 
@@ -57,5 +57,13 @@ extension JSONEncoder {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         return encoder
+    }
+}
+
+extension JSONDecoder {
+    static var dotWeaver: JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
     }
 }

@@ -12,6 +12,7 @@ public struct AppState: Codable {
     public var gitHost: String
     public var providerTransportModes: [SyncProvider: ProviderTransportMode]
     public var nativeProviderConfigs: [SyncProvider: NativeProviderConfig]
+    public var selectedSyncMachineID: String
     public var securityScopedBookmarks: [String: Data]
 
     public init(
@@ -26,6 +27,7 @@ public struct AppState: Codable {
         gitHost: String = "GitHub",
         providerTransportModes: [SyncProvider: ProviderTransportMode] = [:],
         nativeProviderConfigs: [SyncProvider: NativeProviderConfig] = [:],
+        selectedSyncMachineID: String = "",
         securityScopedBookmarks: [String: Data] = [:]
     ) {
         self.dotfiles = dotfiles
@@ -39,6 +41,7 @@ public struct AppState: Codable {
         self.gitHost = gitHost
         self.providerTransportModes = providerTransportModes
         self.nativeProviderConfigs = nativeProviderConfigs
+        self.selectedSyncMachineID = selectedSyncMachineID
         self.securityScopedBookmarks = securityScopedBookmarks
     }
 
@@ -54,6 +57,7 @@ public struct AppState: Codable {
         case gitHost
         case providerTransportModes
         case nativeProviderConfigs
+        case selectedSyncMachineID
         case securityScopedBookmarks
     }
 
@@ -70,6 +74,7 @@ public struct AppState: Codable {
         self.gitHost = try container.decodeIfPresent(String.self, forKey: .gitHost) ?? "GitHub"
         self.providerTransportModes = try container.decodeIfPresent([SyncProvider: ProviderTransportMode].self, forKey: .providerTransportModes) ?? [:]
         self.nativeProviderConfigs = try container.decodeIfPresent([SyncProvider: NativeProviderConfig].self, forKey: .nativeProviderConfigs) ?? [:]
+        self.selectedSyncMachineID = try container.decodeIfPresent(String.self, forKey: .selectedSyncMachineID) ?? ""
         self.securityScopedBookmarks = try container.decodeIfPresent([String: Data].self, forKey: .securityScopedBookmarks) ?? [:]
     }
 }

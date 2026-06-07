@@ -50,7 +50,7 @@ dw git push
 dw git status
 ```
 
-`dw sync` writes provider data into the configured repository. `dw git push` stages `.dotweaver/files`, creates a sync commit if needed, and pushes to `origin <branch>`.
+`dw sync` writes provider data into the configured repository. Folder-backed providers store files by machine under `.dotweaver/files/machines/<machine-id>/`. `dw git push` stages `.dotweaver`, creates a sync commit if needed, and pushes to `origin <branch>`.
 
 ## Snapshots And Conflicts
 
