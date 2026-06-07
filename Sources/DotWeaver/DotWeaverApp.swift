@@ -46,7 +46,7 @@ struct DotWeaver: App {
             }
         }
         
-        MenuBarExtra("DotWeaver", image: "dotweaver-icon") {
+        MenuBarExtra {
             Button("Sync Now") {
                 Task {
                     await viewModel.syncBidirectional()
@@ -76,6 +76,12 @@ struct DotWeaver: App {
             
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
+            }
+        } label: {
+            if let image = DotWeaverAssets.brandIcon() {
+                Image(nsImage: image)
+            } else {
+                Image(systemName: "doc.text.magnifyingglass")
             }
         }
         

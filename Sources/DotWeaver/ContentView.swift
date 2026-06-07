@@ -43,18 +43,42 @@ struct VisualEffectView: NSViewRepresentable {
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
 
+enum DotWeaverAssets {
+    static func brandIcon() -> NSImage? {
+        if let image = NSImage(named: "dotweaver-icon") {
+            return image
+        }
+
+        guard let url = Bundle.module.url(forResource: "dotweaver-icon", withExtension: "png") else {
+            return nil
+        }
+
+        return NSImage(contentsOf: url)
+    }
+}
+
 struct DotWeaverBrandIcon: View {
     var size: CGFloat
 
     var body: some View {
-        Image("dotweaver-icon")
-            .resizable()
-            .interpolation(.high)
-            .antialiased(true)
-            .scaledToFit()
-            .frame(width: size, height: size)
-            .clipShape(RoundedRectangle(cornerRadius: max(6, size * 0.18), style: .continuous))
-            .shadow(color: .blue.opacity(0.35), radius: size * 0.18)
+        Group {
+            if let image = DotWeaverAssets.brandIcon() {
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .antialiased(true)
+                    .scaledToFit()
+            } else {
+                Image(systemName: "doc.text.magnifyingglass")
+                    .resizable()
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.blue)
+                    .scaledToFit()
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: max(6, size * 0.18), style: .continuous))
+        .shadow(color: Color.blue.opacity(0.35), radius: size * 0.18)
     }
 }
 
