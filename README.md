@@ -6,7 +6,7 @@ Current status: **v1.0.0 released on GitHub**. Core app, CLI, sync providers, se
 
 ## Requirements
 
-- macOS 15 or newer
+- macOS 14 or newer
 - Xcode command line tools
 - Swift Package Manager
 - Optional: Git, provider desktop sync clients, mounted remote folders, or `curl` credentials for native protocol providers

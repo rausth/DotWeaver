@@ -93,7 +93,7 @@
 **Success Criteria:**
 - Template rendering tested with 20+ template files
 - CLI commands documented and tested
-- Direct download installation tested on clean macOS 15 VM
+- Direct download installation tested on clean macOS 14 and 15 VMs
 
 ---
 
@@ -152,7 +152,7 @@
 
 **Testing Infrastructure:**
 - GitHub Actions (CI/CD)
-- macOS 15 virtual machines (for testing)
+- macOS 14 and 15 virtual machines (for testing)
 - Physical Mac for Touch ID testing
 
 **External Services (for testing):**

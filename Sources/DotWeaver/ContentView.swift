@@ -13,15 +13,30 @@ struct MeshBackground: View {
     @State private var t: Float = 0.0
     
     var body: some View {
-        MeshGradient(width: 3, height: 3, points: [
-            [0, 0], [0.5, 0], [1, 0],
-            [sin(t)*0.1, 0.5], [0.5, 0.5 + cos(t)*0.1], [1 - sin(t)*0.1, 0.5],
-            [0, 1], [0.5, 1], [1, 1]
-        ], colors: [
-            .black, Color(red: 0.0, green: 0.1, blue: 0.3).opacity(0.8), .black,
-            Color(red: 0.1, green: 0.0, blue: 0.2).opacity(0.6), .black, Color(red: 0.0, green: 0.2, blue: 0.2).opacity(0.7),
-            .black, Color(red: 0.0, green: 0.05, blue: 0.2).opacity(0.8), .black
-        ])
+        Group {
+            if #available(macOS 15.0, *) {
+                MeshGradient(width: 3, height: 3, points: [
+                    [0, 0], [0.5, 0], [1, 0],
+                    [sin(t)*0.1, 0.5], [0.5, 0.5 + cos(t)*0.1], [1 - sin(t)*0.1, 0.5],
+                    [0, 1], [0.5, 1], [1, 1]
+                ], colors: [
+                    .black, Color(red: 0.0, green: 0.1, blue: 0.3).opacity(0.8), .black,
+                    Color(red: 0.1, green: 0.0, blue: 0.2).opacity(0.6), .black, Color(red: 0.0, green: 0.2, blue: 0.2).opacity(0.7),
+                    .black, Color(red: 0.0, green: 0.05, blue: 0.2).opacity(0.8), .black
+                ])
+            } else {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.005, green: 0.005, blue: 0.01),
+                        Color(red: 0.0, green: 0.04, blue: 0.16),
+                        Color(red: 0.0, green: 0.12, blue: 0.12),
+                        Color.black
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        }
         .ignoresSafeArea()
         .background(Color(red: 0.005, green: 0.005, blue: 0.01))
         .onAppear {

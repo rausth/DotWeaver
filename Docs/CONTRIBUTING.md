@@ -39,7 +39,7 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 ### Prerequisites
 
-- macOS 15.0 or later
+- macOS 14.0 or later
 - Xcode 16.0 or later
 - Swift 6.0 or later
 

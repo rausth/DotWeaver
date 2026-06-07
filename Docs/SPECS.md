@@ -51,7 +51,7 @@ DotWeaver follows a **modular, layered architecture** optimized for macOS native
 | Layer | Technology | Version | Rationale |
 |-------|------------|---------|-----------|
 | **Language** | Swift | 6.0 | Modern concurrency, type safety, native performance |
-| **UI Framework** | SwiftUI | macOS 15+ | Declarative UI, native integration, Dark Mode support |
+| **UI Framework** | SwiftUI | macOS 14+ | Declarative UI, native integration, Dark Mode support |
 | **Architecture** | MVVM + Actors | - | Testability, thread safety, state management |
 | **Security** | Keychain Services, LocalAuthentication, CryptoKit, Secure Enclave | - | Secure Enclave-wrapped vault key when available, Keychain fallback, biometric auth, AES.GCM encryption |
 | **Networking** | URLSession, NIO SSH (optional) | - | Native async networking, certificate pinning |

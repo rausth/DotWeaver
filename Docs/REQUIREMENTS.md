@@ -62,7 +62,7 @@ DotWeaver provides a unified interface for managing dotfiles using various stora
 - **NFR-09**: No telemetry or analytics collection without explicit user consent
 
 ### 3.4 Compatibility
-- **NFR-10**: Support for macOS 15.0 (Sequoia) and later
+- **NFR-10**: Support for macOS 14.0 (Sonoma) and later
 - **NFR-11**: Compatible with Apple Silicon (M-series) and Intel Macs
 - **NFR-12**: CLI tool compatible with zsh, bash, and fish shells
 

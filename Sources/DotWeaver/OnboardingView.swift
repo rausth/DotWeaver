@@ -8,17 +8,7 @@ struct OnboardingView: View {
     
     var body: some View {
         ZStack {
-            // Liquid Glass Background
-            MeshGradient(width: 3, height: 3, points: [
-                [0, 0], [0.5, 0], [1, 0],
-                [0, 0.5], [0.5, 0.5], [1, 0.5],
-                [0, 1], [0.5, 1], [1, 1]
-            ], colors: [
-                .blue.opacity(0.3), .purple.opacity(0.2), .blue.opacity(0.3),
-                .indigo.opacity(0.2), .black, .purple.opacity(0.2),
-                .blue.opacity(0.3), .indigo.opacity(0.2), .blue.opacity(0.3)
-            ])
-            .ignoresSafeArea()
+            onboardingBackground
             
             VStack(spacing: 40) {
                 if currentStep == 0 {
@@ -77,6 +67,34 @@ struct OnboardingView: View {
             .shadow(color: .black.opacity(0.3), radius: 30, x: 0, y: 20)
         }
         .frame(width: 900, height: 700)
+    }
+
+    @ViewBuilder
+    private var onboardingBackground: some View {
+        if #available(macOS 15.0, *) {
+            MeshGradient(width: 3, height: 3, points: [
+                [0, 0], [0.5, 0], [1, 0],
+                [0, 0.5], [0.5, 0.5], [1, 0.5],
+                [0, 1], [0.5, 1], [1, 1]
+            ], colors: [
+                .blue.opacity(0.3), .purple.opacity(0.2), .blue.opacity(0.3),
+                .indigo.opacity(0.2), .black, .purple.opacity(0.2),
+                .blue.opacity(0.3), .indigo.opacity(0.2), .blue.opacity(0.3)
+            ])
+            .ignoresSafeArea()
+        } else {
+            LinearGradient(
+                colors: [
+                    Color(red: 0.005, green: 0.005, blue: 0.01),
+                    Color.blue.opacity(0.24),
+                    Color.purple.opacity(0.18),
+                    Color.black
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+        }
     }
     
     var stepOne: some View {

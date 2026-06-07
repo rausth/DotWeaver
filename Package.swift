@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "DotWeaver",
-    platforms: [.macOS(.v15)],
+    platforms: [.macOS(.v14)],
     products: [
         .executable(name: "DotWeaverApp", targets: ["DotWeaver"]),
         .executable(name: "dw", targets: ["DotWeaverCLI"])
