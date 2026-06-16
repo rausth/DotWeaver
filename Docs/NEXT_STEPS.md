@@ -1,7 +1,7 @@
 # DotWeaver - Next Steps
 
 **Date:** June 16, 2026
-**Status:** v1.0.0 is ready for GitHub/ad-hoc distribution. Core app, CLI, sync, security hardening, Sparkle packaging, local release validation, and website are implemented. Apple notarization remains blocked by paid Apple Developer credentials.
+**Status:** v1.0.1 is ready for GitHub/ad-hoc distribution. Core app, CLI, sync, security hardening, Sparkle packaging, local release validation, and website are implemented. Apple notarization remains blocked by paid Apple Developer credentials.
 
 ## Complete
 
@@ -15,7 +15,7 @@
 - Real conflict comparison and resolution against stored provider copies
 - CLI parity commands for files, sync, providers, native config, Git config, snapshots, conflicts, doctor, hooks, templates
 - Snapshot create/list/restore/delete
-- Snapshot path preservation, provider snapshot sync, source-machine restore, and UI `Restore File` / `Restore All` actions
+- Snapshot path preservation, provider snapshot sync, source-machine restore, indexed per-file restore, and full snapshot restore actions
 - Machine identity, manifests, and version history
 - AES.GCM vault encryption for provider-stored secret files
 - Biometric/device-owner gates for vaulted sync, snapshot restore, and credential reads
@@ -38,7 +38,7 @@
 - App launch smoke script with optional Accessibility check
 - Local release/appcast validation script
 - Signed Sparkle appcast generation
-- Hosted v1.0.0 release with signed Sparkle appcast
+- Hosted v1.0.1 release with signed Sparkle appcast after tagging and publishing release assets
 - DotWeaver app icon integrated into the app sidebar, onboarding, menu bar extra, and release package resource bundle
 - Dark professional website on GitHub Pages
 - Mackup config import and basic chezmoi source import/export in CLI

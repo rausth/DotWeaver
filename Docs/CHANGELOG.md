@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.1] - 2026-06-16
+
+### Added
+- Source-machine snapshot restore from provider-hosted snapshots.
+- Indexed per-file snapshot restore in the SwiftUI Snapshots view.
+- Snapshot machine filtering and fallback display for snapshots without machine manifests.
+
+### Changed
+- Refined snapshot restore UI to separate per-file restore from full snapshot restore.
+- Updated project status documentation for ad-hoc distribution readiness.
+
+---
+
 ## [1.0.0] - 2026-05-28
 
 ### Added
@@ -105,6 +118,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Type | Highlights |
 |---------|------|------|------------|
+| 1.0.1 | 2026-06-16 | Patch | Source-machine snapshots, indexed per-file restore UI, docs/status refresh |
 | 1.0.0 | 2026-05-28 | Major | Public release, folder-backed providers, biometric auth, vault encryption |
 | 0.9.0 | 2026-05-15 | Minor | Beta release, core architecture, Git + iCloud |
 | 0.5.0 | 2026-04-20 | Minor | Project start, proof of concept |
