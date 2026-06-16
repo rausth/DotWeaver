@@ -1,6 +1,7 @@
 .DS_Store
 .build/
 dist/
+*.rpaths.txt
 Archive.zip
 *.zip
 *.tar.gz
