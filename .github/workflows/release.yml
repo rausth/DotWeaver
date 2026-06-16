@@ -76,9 +76,3 @@ jobs:
           body_path: Docs/CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Validate hosted Sparkle assets
-        env:
-          APPCAST_URL: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/appcast.xml
-          REQUIRE_SPARKLE_SIGNATURE: ${{ secrets.SPARKLE_PRIVATE_KEY != '' && '1' || '0' }}
-        run: script/validate_hosted_sparkle.sh

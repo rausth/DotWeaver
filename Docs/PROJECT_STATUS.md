@@ -1,8 +1,8 @@
 # DotWeaver Project Status
 
-**Date:** June 5, 2026
+**Date:** June 16, 2026
 **Version:** 1.0.0
-**Status:** Released on GitHub with passing CI, Pages, Release workflow, signed Sparkle appcast, and hosted Sparkle validation. Apple notarization still requires external Apple Developer credentials.
+**Status:** Ready for GitHub/ad-hoc distribution with passing CI, Pages, release workflow, signed Sparkle appcast generation, and local release validation. Apple notarization still requires external Apple Developer credentials.
 
 ## Current Implementation
 
@@ -14,16 +14,18 @@
 | Native protocol providers | Implemented | WebDAV/SFTP/FTPS/S3 through system `curl` endpoint transfer |
 | Git provider | Implemented | Local folder sync plus `git pull` / `git push` |
 | Conflict resolution | Implemented | Reads local and stored file copies; applies selected strategy |
-| CLI | Implemented | Files, sync, providers, native config, Git config, snapshots, conflicts, doctor, hooks, templates, interop |
-| Snapshots | Implemented | Preserves nested paths and syncs snapshot copies to provider folder |
+| CLI | Implemented | Files, sync, providers, native config, Git config, snapshots, partial restore, conflicts, doctor, hooks, templates, interop, `dw plan`, and `dw status --diff` |
+| Snapshots | Implemented | Preserves nested paths, supports partial file restore, and syncs snapshot copies to provider folder |
 | Machine/version manifests | Implemented | Machine identity, file manifest, per-file version records |
-| Vault encryption | Implemented | AES.GCM payloads, master key stored in Keychain |
+| Vault encryption | Implemented | AES.GCM payloads, master key stored in Keychain, template vault placeholders |
 | Sensitive auth gates | Implemented | Vaulted sync, snapshot restore, credential reads |
-| Hook policy | Implemented | Hooks disabled by default; audited when skipped/executed |
-| Tests | Passing | Unit/integration tests cover core provider, vault, snapshot, native endpoint safety, Git remote behavior, provider permissions, shared restore, and interop parsing |
+| Hook policy | Implemented | Hooks disabled by default, SHA-256 approved, path-contained, restricted-env, and audited when skipped/executed |
+| Audit log | Implemented | Rotation with hash-chain fields |
+| Ignore rules | Implemented | Provider-root `.dotignore` filtering for planning and sync |
+| Tests | Passing | 28 unit/integration tests cover core provider, vault, snapshot, native endpoint safety, Git remote behavior, provider permissions, shared restore, interop parsing, ignore rules, hooks, templates, audit, and CLI planning |
 | Release packaging | Implemented | Universal app/CLI artifacts, Sparkle framework embedding, app icon resource bundle embedding, appcast generation, local signature/rpath verification |
 | Sparkle signing | Configured | GitHub Actions secrets are configured for `SPARKLE_PUBLIC_ED_KEY` and `SPARKLE_PRIVATE_KEY`; local signed-appcast validation passes |
-| Smoke validation | Implemented | Provider matrix, app launch, local appcast, hosted Sparkle appcast, signature, rpath, checksum, CLI help, real mounted-folder, and native endpoint validators |
+| Smoke validation | Implemented | Provider matrix, app launch, local appcast, signature, rpath, checksum, CLI help, real mounted-folder, and native endpoint validators |
 | Native remote protocol clients | Implemented | WebDAV/SFTP/FTPS/S3 endpoint transfer via system `curl`; embedded SDK clients are not included |
 
 ## Provider Storage
@@ -46,7 +48,6 @@ For cloud and remote-style providers, synchronization to the remote service is h
 - Mackup/chezmoi interop covers common import/export paths; full preset catalogs and advanced template/script semantics remain v1.x growth work.
 - Secure Enclave wrapping is opportunistic: supported hardware uses Secure Enclave wrapping; unsupported hardware falls back to Keychain-only storage.
 - Live notarization requires Apple Developer credentials and remains disabled until those GitHub Actions secrets are configured.
-- Hosted Sparkle validation is implemented and passed for `v1.0.0`.
 
 ## Last Verified
 
@@ -57,7 +58,6 @@ script/validate_release_local.sh
 script/smoke_app_ui.sh
 script/smoke_real_provider_folders.sh
 script/smoke_native_protocol_endpoints.sh
-APPCAST_URL=https://github.com/rausth/DotWeaver/releases/download/v1.0.0/appcast.xml REQUIRE_SPARKLE_SIGNATURE=1 script/validate_hosted_sparkle.sh
 ```
 
 Result: passing.

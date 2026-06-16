@@ -20,7 +20,6 @@ If Apple signing secrets are absent, the workflow builds ad-hoc signed release a
 3. Run `script/package_release.sh`.
 4. Generate `appcast.xml` with `script/generate_appcast.sh`.
 5. Publish GitHub release assets.
-6. Validate hosted Sparkle appcast and release asset with `script/validate_hosted_sparkle.sh`.
 
 ## Release Assets
 
@@ -53,42 +52,24 @@ https://github.com/rausth/DotWeaver/releases/latest/download/appcast.xml
 
 The appcast item points to the tag-specific app ZIP under GitHub Releases. This keeps the embedded feed URL stable while each appcast entry downloads the exact release artifact.
 
-Generate keys:
+Provide Sparkle keys through GitHub Actions secrets:
 
 ```bash
-script/generate_sparkle_keys.sh
-script/generate_sparkle_keys.sh /tmp/dotweaver-sparkle-private-key.txt
-```
-
-If the Sparkle Keychain-backed generator cannot run in an automation host, generate a CI keypair without storing anything in the login keychain:
-
-```bash
-script/generate_sparkle_ci_keys.sh /tmp/dotweaver-sparkle-private-key.txt
-gh secret set SPARKLE_PUBLIC_ED_KEY --body "<printed-public-key>"
-gh secret set SPARKLE_PRIVATE_KEY < /tmp/dotweaver-sparkle-private-key.txt
+gh secret set SPARKLE_PUBLIC_ED_KEY --body "<public-key>"
+gh secret set SPARKLE_PRIVATE_KEY < /path/to/dotweaver-sparkle-private-key.txt
 ```
 
 Do not commit the private key file.
 
-## Hosted Validation
+## Validation
 
-After release assets are uploaded:
+Before tagging a release, run local validation:
 
 ```bash
-APPCAST_URL=https://github.com/rausth/DotWeaver/releases/download/v1.0.0/appcast.xml \
-script/validate_hosted_sparkle.sh
+swift test
+script/validate_release_local.sh
 ```
 
-Validation checks:
-
-- appcast is reachable over HTTPS
-- exactly one update item exists
-- version matches `VERSION.txt`
-- enclosure URL uses HTTPS
-- enclosure length is present
-- `sparkle:edSignature` is present
-- release ZIP is reachable
-
-The release workflow runs this check after publishing assets.
+Validation checks release artifact generation, local appcast structure, Sparkle signature metadata when configured, checksums, codesign verification, rpath, and CLI help.
 
 For production distribution, configure both Sparkle key secrets before tagging the release. Apple notarization secrets are separate and only needed when notarization is in scope.

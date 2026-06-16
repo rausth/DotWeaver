@@ -13,8 +13,6 @@
 
 DotWeaver is a native macOS dotfiles manager for synchronizing development configuration across machines with a SwiftUI app, a `dw` CLI, provider-backed storage, encrypted vault files, snapshots, conflict resolution, and release packaging for GitHub/ad-hoc distribution.
 
-![DotWeaver terminal recording placeholder](Docs/assets/dotweaver-vhs.gif)
-
 ```mermaid
 flowchart LR
   CLI["dw CLI"] --> Core["DotWeaverKit"]

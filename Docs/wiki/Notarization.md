@@ -26,20 +26,7 @@ DotWeaver uses direct macOS distribution outside the App Store. Release builds m
 
 ## Sparkle Keys
 
-Generate or print the Sparkle public key:
-
-```bash
-swift build
-script/generate_sparkle_keys.sh
-```
-
-Export the private key for CI:
-
-```bash
-script/generate_sparkle_keys.sh /tmp/dotweaver-sparkle-private-key.txt
-```
-
-Use the printed public key as `SPARKLE_PUBLIC_ED_KEY`. Store the exported private key file contents as `SPARKLE_PRIVATE_KEY`.
+Use an EdDSA keypair accepted by Sparkle. Configure the public key as `SPARKLE_PUBLIC_ED_KEY` and the private key as `SPARKLE_PRIVATE_KEY` in GitHub Actions secrets.
 
 Never commit the Sparkle private key. Use GitHub Actions secrets or a local secure store.
 
@@ -84,16 +71,15 @@ The script:
 7. Staples and validates the notarization ticket.
 8. Recreates the release zip after stapling.
 
-## Sparkle Hosted Update Validation
+## Local Release Validation
 
-After GitHub release assets exist:
+Before tagging a release:
 
 ```bash
-APPCAST_URL=https://github.com/rausth/DotWeaver/releases/download/v1.0.0/appcast.xml \
-script/validate_hosted_sparkle.sh
+script/validate_release_local.sh
 ```
 
-This verifies the hosted appcast and release ZIP that Sparkle will fetch. It does not need Apple credentials, but it does require the signed appcast and ZIP to be already published.
+This verifies local packaging, appcast generation, Sparkle signature metadata when configured, checksums, codesign verification, rpath, and CLI help.
 
 ## Verification
 
