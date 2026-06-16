@@ -431,6 +431,96 @@ final class DotWeaverKitTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: second, encoding: .utf8), "changed-two\n")
     }
 
+    func testProviderSnapshotDiscoveryIncludesMachineMetadata() throws {
+        let tempRoot = try makeTemporaryDirectory()
+        let providerRoot = tempRoot.appendingPathComponent("Provider")
+        let target = tempRoot.appendingPathComponent(".zshrc")
+        let machine = MachineIdentity(
+            id: "intel1-id",
+            hostname: "intel1",
+            userName: "rausth",
+            osVersion: "macOS 14",
+            architecture: "x86_64",
+            createdAt: Date()
+        )
+        let snapshot = Snapshot(
+            name: "intel-baseline",
+            fileCount: 1,
+            machineID: machine.id,
+            entries: [SnapshotEntry(originalPath: target.path, relativeStoragePath: ".zshrc", isSecret: false)]
+        )
+        try writeProviderSnapshot(snapshot, machine: machine, providerRoot: providerRoot, contents: [".zshrc": "export INTEL=1\n"])
+
+        let items = SnapshotManager().listProviderSnapshots(providerRootPath: providerRoot.path)
+
+        let item = try XCTUnwrap(items.first)
+        XCTAssertEqual(items.count, 1)
+        XCTAssertEqual(item.snapshot.name, "intel-baseline")
+        XCTAssertEqual(item.sourceMachineID, "intel1-id")
+        XCTAssertEqual(item.machine?.hostname, "intel1")
+        XCTAssertEqual(item.location, .provider)
+    }
+
+    func testProviderSnapshotRestoreWorksWithoutLocalSnapshot() throws {
+        let tempRoot = try makeTemporaryDirectory()
+        let providerRoot = tempRoot.appendingPathComponent("Provider")
+        let target = tempRoot.appendingPathComponent(".gitconfig")
+        try "changed\n".write(to: target, atomically: true, encoding: .utf8)
+        let machine = MachineIdentity(
+            id: "linux-id",
+            hostname: "linux-laptop",
+            userName: "rausth",
+            osVersion: "Linux",
+            architecture: "x86_64",
+            createdAt: Date()
+        )
+        let snapshot = Snapshot(
+            name: "linux-baseline",
+            fileCount: 1,
+            machineID: machine.id,
+            entries: [SnapshotEntry(originalPath: target.path, relativeStoragePath: ".gitconfig", isSecret: false)]
+        )
+        try writeProviderSnapshot(snapshot, machine: machine, providerRoot: providerRoot, contents: [".gitconfig": "[user]\n\tname = Linux\n"])
+        let item = try XCTUnwrap(SnapshotManager().listProviderSnapshots(providerRootPath: providerRoot.path).first)
+
+        try SnapshotManager().restoreSnapshot(item)
+
+        XCTAssertEqual(try String(contentsOf: target, encoding: .utf8), "[user]\n\tname = Linux\n")
+    }
+
+    func testProviderSnapshotCanRestoreSingleFile() throws {
+        let tempRoot = try makeTemporaryDirectory()
+        let providerRoot = tempRoot.appendingPathComponent("Provider")
+        let first = tempRoot.appendingPathComponent(".first")
+        let second = tempRoot.appendingPathComponent(".second")
+        try "changed-one\n".write(to: first, atomically: true, encoding: .utf8)
+        try "changed-two\n".write(to: second, atomically: true, encoding: .utf8)
+        let machine = MachineIdentity(
+            id: "arm1-id",
+            hostname: "arm1",
+            userName: "rausth",
+            osVersion: "macOS 15",
+            architecture: "arm64",
+            createdAt: Date()
+        )
+        let snapshot = Snapshot(
+            name: "arm-baseline",
+            fileCount: 2,
+            machineID: machine.id,
+            entries: [
+                SnapshotEntry(originalPath: first.path, relativeStoragePath: ".first", isSecret: false),
+                SnapshotEntry(originalPath: second.path, relativeStoragePath: ".second", isSecret: false)
+            ]
+        )
+        try writeProviderSnapshot(snapshot, machine: machine, providerRoot: providerRoot, contents: [".first": "one\n", ".second": "two\n"])
+        let item = try XCTUnwrap(SnapshotManager().listProviderSnapshots(providerRootPath: providerRoot.path).first)
+
+        try SnapshotManager().restoreSnapshot(item, matching: first.path)
+
+        XCTAssertEqual(try String(contentsOf: first, encoding: .utf8), "one\n")
+        XCTAssertEqual(try String(contentsOf: second, encoding: .utf8), "changed-two\n")
+    }
+
     func testAuditLogWritesHashChainFields() throws {
         let tempRoot = try makeTemporaryDirectory()
         setenv("DOTWEAVER_APP_SUPPORT_DIR", tempRoot.path, 1)
@@ -470,6 +560,29 @@ final class DotWeaverKitTests: XCTestCase {
             }
             return nil
         })
+    }
+
+    private func writeProviderSnapshot(
+        _ snapshot: Snapshot,
+        machine: MachineIdentity,
+        providerRoot: URL,
+        contents: [String: String]
+    ) throws {
+        let snapshotRoot = providerRoot
+            .appendingPathComponent(".dotweaver/snapshots")
+            .appendingPathComponent(machine.id)
+            .appendingPathComponent(UUID().uuidString)
+        let filesRoot = snapshotRoot.appendingPathComponent("files")
+        let machinesRoot = providerRoot.appendingPathComponent(".dotweaver/manifests/machines")
+        try FileManager.default.createDirectory(at: filesRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: machinesRoot, withIntermediateDirectories: true)
+        try JSONEncoder.pretty.encode(snapshot).write(to: snapshotRoot.appendingPathComponent("metadata.json"), options: .atomic)
+        try JSONEncoder.pretty.encode(machine).write(to: machinesRoot.appendingPathComponent(machine.id + ".json"), options: .atomic)
+        for (relativePath, content) in contents {
+            let url = filesRoot.appendingPathComponent(relativePath)
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try content.write(to: url, atomically: true, encoding: .utf8)
+        }
     }
 
     private func posixPermissions(_ url: URL) throws -> Int {

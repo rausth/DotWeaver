@@ -8,7 +8,7 @@
   <a href="https://github.com/rausth/DotWeaver/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/rausth/DotWeaver/ci.yml?branch=main&label=ci&style=flat-square"></a>
   <img alt="Version" src="https://img.shields.io/badge/version-1.0.0--85-blue?style=flat-square">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-green?style=flat-square"></a>
-  <img alt="Tests" src="https://img.shields.io/badge/tests-28%20passing-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-31%20passing-brightgreen?style=flat-square">
 </p>
 
 DotWeaver is a native macOS dotfiles manager for synchronizing development configuration across machines with a SwiftUI app, a `dw` CLI, provider-backed storage, encrypted vault files, snapshots, conflict resolution, and release packaging for GitHub/ad-hoc distribution.
@@ -53,7 +53,7 @@ flowchart LR
 - Folder-backed sync for iCloud, OneDrive, Google Drive, Dropbox, WebDAV, SFTP, FTPS, and S3-compatible storage.
 - Native Protocol mode for WebDAV, SFTP, FTPS, and S3-compatible endpoints through system `curl`.
 - Git provider with local repository storage plus optional `pull` and `push`.
-- Per-machine namespaces, manifests, version history, and snapshots.
+- Per-machine namespaces, manifests, version history, and source-machine snapshot restore.
 - `.dotignore` filtering for sync planning and execution.
 - `dw plan` and `dw status --diff` for dry-run inspection.
 - AES.GCM vault encryption before provider storage.
@@ -205,11 +205,18 @@ dw vault ~/.ssh/config
 dw snapshot create before-shell-change
 dw snapshot list
 
-# Full restore
+# List machines with provider-hosted snapshots
+dw snapshot machines
+
+# Full restore from current/local snapshot
 dw snapshot restore before-shell-change
 
-# Partial restore
-dw snapshot restore before-shell-change --file ~/.zshrc
+# Restore from a chosen source machine after installing on a new laptop
+dw snapshot list --machine intel1
+dw snapshot restore before-shell-change --machine intel1
+
+# Partial restore from a chosen source machine
+dw snapshot restore before-shell-change --machine linux-laptop --file ~/.zshrc
 ```
 
 ```bash
@@ -330,10 +337,10 @@ DotWeaver is a Swift Package targeting macOS 14 or newer.
 <provider-root>/.dotweaver/manifests/machines/
 <provider-root>/.dotweaver/manifests/files/
 <provider-root>/.dotweaver/versions/
-<provider-root>/.dotweaver/snapshots/
+<provider-root>/.dotweaver/snapshots/<machine-id>/
 ```
 
-Folder-backed providers store each machine under its own namespace. Native Protocol providers delegate transfer to `/usr/bin/curl`. DotWeaver does not store native protocol passwords; use SSH keys, `.netrc`, endpoint tokens, or external credential helpers.
+Folder-backed providers store each machine under its own namespace. Provider-hosted snapshots are grouped by source machine, so a new device can restore files from `intel1`, `arm1`, or `linux-laptop` after the same provider root is configured. Native Protocol providers delegate transfer to `/usr/bin/curl`. DotWeaver does not store native protocol passwords; use SSH keys, `.netrc`, endpoint tokens, or external credential helpers.
 
 ### Security model
 

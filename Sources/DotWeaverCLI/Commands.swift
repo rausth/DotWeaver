@@ -77,9 +77,10 @@ struct CLICommands {
           dw git status
 
         Snapshots/conflicts:
-          dw snapshot list
+          dw snapshot machines
+          dw snapshot list [--machine <id-or-hostname>]
           dw snapshot create <name>
-          dw snapshot restore <id-or-name> [--file <path>]
+          dw snapshot restore <id-or-name> [--machine <id-or-hostname>] [--file <path>]
           dw snapshot delete <id-or-name>
           dw conflicts list
           dw conflicts resolve <file> <local|stored|newest>
@@ -313,26 +314,45 @@ struct CLICommands {
     static func snapshot(_ args: [String]) async throws {
         guard let sub = args.first else { throw CLIError.message("snapshot requires subcommand") }
         let manager = SnapshotManager()
+        let state = StateManager.loadState()
+        let providerRoot = currentProviderRootPath(state)
         switch sub {
+        case "machines":
+            let items = manager.listSnapshotCatalog(providerRootPath: providerRoot, includeLocal: true)
+            let machines = snapshotMachines(from: items)
+            if machines.isEmpty {
+                print("No snapshot machines")
+                return
+            }
+            for machine in machines {
+                print("\(machine.id) host=\(machine.hostname) user=\(machine.userName) arch=\(machine.architecture) os=\(machine.osVersion)")
+            }
         case "list":
-            for snapshot in manager.listSnapshots() {
-                print("\(snapshot.id.uuidString) \(snapshot.name) files=\(snapshot.fileCount) machine=\(snapshot.machineID) date=\(snapshot.date)")
+            let machine = try resolveMachineFilter(optionValue("--machine", in: args), manager: manager, providerRootPath: providerRoot)
+            let snapshots = filteredSnapshots(manager.listSnapshotCatalog(providerRootPath: providerRoot, includeLocal: true), machineID: machine?.id)
+            if snapshots.isEmpty {
+                print("No snapshots")
+                return
+            }
+            for item in snapshots {
+                print("\(item.snapshot.id.uuidString) \(item.snapshot.name) files=\(item.snapshot.fileCount) machine=\(item.sourceMachineLabel) location=\(item.location.rawValue) date=\(item.snapshot.date)")
             }
         case "create":
             let name = try requiredArg(args, 1, "snapshot name")
-            let state = StateManager.loadState()
-            let snapshot = try manager.createSnapshot(dotfiles: state.dotfiles, name: name, providerRootPath: currentProviderRootPath(state))
+            let snapshot = try manager.createSnapshot(dotfiles: state.dotfiles, name: name, providerRootPath: providerRoot)
             print("Snapshot: \(snapshot.id.uuidString) \(snapshot.name)")
         case "restore":
-            let snapshot = try findSnapshot(requiredArg(args, 1, "snapshot id-or-name"), manager: manager)
+            let machine = try resolveMachineFilter(optionValue("--machine", in: args), manager: manager, providerRootPath: providerRoot)
+            let item = try findSnapshot(requiredArg(args, 1, "snapshot id-or-name"), manager: manager, providerRootPath: providerRoot, machineID: machine?.id)
             let file = optionValue("--file", in: args)
             if SecurityPolicy.requiresBiometricAuthentication {
                 _ = try await BiometricAuthenticator.shared.authenticate(reason: "Authenticate to restore snapshot")
             }
-            try manager.restoreSnapshot(snapshot, matching: file)
-            print(file == nil ? "Restored: \(snapshot.name)" : "Restored: \(file!) from \(snapshot.name)")
+            try manager.restoreSnapshot(item, matching: file)
+            let scope = machine.map { " from \($0.hostname)" } ?? ""
+            print(file == nil ? "Restored: \(item.snapshot.name)\(scope)" : "Restored: \(file!) from \(item.snapshot.name)\(scope)")
         case "delete":
-            let snapshot = try findSnapshot(requiredArg(args, 1, "snapshot id-or-name"), manager: manager)
+            let snapshot = try findLocalSnapshot(requiredArg(args, 1, "snapshot id-or-name"), manager: manager)
             try manager.deleteSnapshot(snapshot)
             print("Deleted: \(snapshot.name)")
         default:
@@ -688,12 +708,44 @@ private func applyDotfileOptions(_ dotfile: inout Dotfile, args: [String]) {
     }
 }
 
-private func findSnapshot(_ idOrName: String, manager: SnapshotManager) throws -> Snapshot {
+private func findLocalSnapshot(_ idOrName: String, manager: SnapshotManager) throws -> Snapshot {
     let snapshots = manager.listSnapshots()
     if let snapshot = snapshots.first(where: { $0.id.uuidString == idOrName || $0.name == idOrName }) {
         return snapshot
     }
     throw CLIError.message("Snapshot not found: \(idOrName)")
+}
+
+private func findSnapshot(_ idOrName: String, manager: SnapshotManager, providerRootPath: String?, machineID: String?) throws -> SnapshotCatalogItem {
+    let matches = filteredSnapshots(manager.listSnapshotCatalog(providerRootPath: providerRootPath, includeLocal: true), machineID: machineID)
+        .filter { $0.snapshot.id.uuidString == idOrName || $0.snapshot.name == idOrName }
+    guard !matches.isEmpty else { throw CLIError.message("Snapshot not found: \(idOrName)") }
+    guard matches.count == 1 else { throw CLIError.message("Multiple snapshots match: \(idOrName). Use --machine <id-or-hostname>.") }
+    return matches[0]
+}
+
+private func filteredSnapshots(_ items: [SnapshotCatalogItem], machineID: String?) -> [SnapshotCatalogItem] {
+    guard let machineID, !machineID.isEmpty else { return items }
+    return items.filter { $0.sourceMachineID == machineID }
+}
+
+private func snapshotMachines(from items: [SnapshotCatalogItem]) -> [MachineIdentity] {
+    var seen = Set<String>()
+    return items.compactMap(\.machine).filter { machine in
+        if seen.contains(machine.id) { return false }
+        seen.insert(machine.id)
+        return true
+    }.sorted { $0.hostname.localizedCaseInsensitiveCompare($1.hostname) == .orderedAscending }
+}
+
+private func resolveMachineFilter(_ raw: String?, manager: SnapshotManager, providerRootPath: String?) throws -> MachineIdentity? {
+    guard let raw, !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+    let machines = snapshotMachines(from: manager.listSnapshotCatalog(providerRootPath: providerRootPath, includeLocal: true))
+    if let exact = machines.first(where: { $0.id == raw }) { return exact }
+    let matches = machines.filter { $0.hostname.localizedCaseInsensitiveCompare(raw) == .orderedSame }
+    guard !matches.isEmpty else { throw CLIError.message("Machine not found: \(raw)") }
+    guard matches.count == 1 else { throw CLIError.message("Multiple machines match hostname: \(raw). Use machine ID.") }
+    return matches[0]
 }
 
 private func resolveConflict(path: String, strategy: String) throws {

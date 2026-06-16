@@ -15,7 +15,7 @@
 - Real conflict comparison and resolution against stored provider copies
 - CLI parity commands for files, sync, providers, native config, Git config, snapshots, conflicts, doctor, hooks, templates
 - Snapshot create/list/restore/delete
-- Snapshot path preservation and provider snapshot sync
+- Snapshot path preservation, provider snapshot sync, and source-machine restore
 - Machine identity, manifests, and version history
 - AES.GCM vault encryption for provider-stored secret files
 - Biometric/device-owner gates for vaulted sync, snapshot restore, and credential reads
@@ -26,6 +26,7 @@
 - `dw plan` dry-run sync inspection
 - `dw status --diff` local-vs-stored content comparison
 - Partial snapshot restore with `dw snapshot restore <id-or-name> --file <path>`
+- Provider-hosted snapshot restore from selected machines with `dw snapshot restore <id-or-name> --machine <id-or-hostname>`
 - Keychain credential update-or-add behavior
 - Audit log rotation with hash-chain fields
 - File editor
@@ -51,7 +52,7 @@ DotWeaver stores files under:
 <provider folder>/.dotweaver/files/machines/<machine-id>/
 <provider folder>/.dotweaver/manifests/
 <provider folder>/.dotweaver/versions/
-<provider folder>/.dotweaver/snapshots/
+<provider folder>/.dotweaver/snapshots/<machine-id>/
 ```
 
 Current providers use this model:
