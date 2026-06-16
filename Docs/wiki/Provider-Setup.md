@@ -18,7 +18,7 @@ Folder-backed providers keep each machine in its own namespace. Use Settings > S
 
 For non-Git providers, choose one transport:
 
-- **Mount/Sync Folder**: selected folder is local, mounted, or synchronized by the provider desktop client.
+- **Path**: selected folder is local, mounted, or synchronized by the provider desktop client.
 - **Native Protocol**: DotWeaver transfers files directly to the configured endpoint through system `curl`.
 
 ## Git Provider

@@ -15,7 +15,7 @@
 - Real conflict comparison and resolution against stored provider copies
 - CLI parity commands for files, sync, providers, native config, Git config, snapshots, conflicts, doctor, hooks, templates
 - Snapshot create/list/restore/delete
-- Snapshot path preservation, provider snapshot sync, and source-machine restore
+- Snapshot path preservation, provider snapshot sync, source-machine restore, and UI `Restore File` / `Restore All` actions
 - Machine identity, manifests, and version history
 - AES.GCM vault encryption for provider-stored secret files
 - Biometric/device-owner gates for vaulted sync, snapshot restore, and credential reads

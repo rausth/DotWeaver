@@ -15,7 +15,7 @@
 | Git provider | Implemented | Local folder sync plus `git pull` / `git push` |
 | Conflict resolution | Implemented | Reads local and stored file copies; applies selected strategy |
 | CLI | Implemented | Files, sync, providers, native config, Git config, snapshots, source-machine restore, partial restore, conflicts, doctor, hooks, templates, interop, `dw plan`, and `dw status --diff` |
-| Snapshots | Implemented | Preserves nested paths, syncs snapshots to provider folder, restores local or provider-hosted snapshots from selected source machines, and supports partial file restore |
+| Snapshots | Implemented | Preserves nested paths, syncs snapshots to provider folder, restores local or provider-hosted snapshots from selected source machines, and supports `Restore File` or `Restore All` in the UI |
 | Machine/version manifests | Implemented | Machine identity, file manifest, per-file version records |
 | Vault encryption | Implemented | AES.GCM payloads, master key stored in Keychain, template vault placeholders |
 | Sensitive auth gates | Implemented | Vaulted sync, snapshot restore, credential reads |

@@ -176,7 +176,7 @@ dw status --diff
 
 ```text
 Plan
-Provider: OneDrive [Mount/Sync Folder]
+Provider: OneDrive [Path]
 Root: /Users/user/OneDrive
 Monitored: 8
 Syncable: 7
@@ -217,6 +217,8 @@ dw snapshot restore before-shell-change --machine intel1
 
 # Partial restore from a chosen source machine
 dw snapshot restore before-shell-change --machine linux-laptop --file ~/.zshrc
+
+# App UI: Snapshots -> source machine picker -> Restore File or Restore All
 ```
 
 ```bash
@@ -340,7 +342,7 @@ DotWeaver is a Swift Package targeting macOS 14 or newer.
 <provider-root>/.dotweaver/snapshots/<machine-id>/
 ```
 
-Folder-backed providers store each machine under its own namespace. Provider-hosted snapshots are grouped by source machine, so a new device can restore files from `intel1`, `arm1`, or `linux-laptop` after the same provider root is configured. Native Protocol providers delegate transfer to `/usr/bin/curl`. DotWeaver does not store native protocol passwords; use SSH keys, `.netrc`, endpoint tokens, or external credential helpers.
+Folder-backed providers store each machine under its own namespace. Provider-hosted snapshots are grouped by source machine, so a new device can restore one file or an entire snapshot from `intel1`, `arm1`, or `linux-laptop` after the same provider root is configured. Native Protocol providers delegate transfer to `/usr/bin/curl`. DotWeaver does not store native protocol passwords; use SSH keys, `.netrc`, endpoint tokens, or external credential helpers.
 
 ### Security model
 

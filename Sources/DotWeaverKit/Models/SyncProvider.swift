@@ -36,7 +36,7 @@ public enum ProviderTransportMode: String, CaseIterable, Identifiable, Codable, 
 
     public var title: String {
         switch self {
-        case .folder: return "Mount/Sync Folder"
+        case .folder: return "Path"
         case .native: return "Native Protocol"
         }
     }

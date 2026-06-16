@@ -95,8 +95,8 @@ struct SnapshotsView: View {
                 ScrollView {
                     LazyVStack(spacing: 16) {
                         ForEach(filteredItems) { item in
-                            SnapshotRow(item: item, restoreAction: {
-                                restore(item)
+                            SnapshotRow(item: item, restoreAction: { filePath in
+                                restore(item, matching: filePath)
                             }, deleteAction: item.location == .local ? {
                                 delete(item.snapshot)
                             } : nil)
@@ -160,16 +160,23 @@ struct SnapshotsView: View {
         }
     }
     
-    private func restore(_ item: SnapshotCatalogItem) {
+    private func restore(_ item: SnapshotCatalogItem, matching filePath: String?) {
         Task {
             do {
                 if SecurityPolicy.requiresBiometricAuthentication {
                     _ = try await BiometricAuthenticator.shared.authenticate(reason: "Authenticate to restore snapshot")
                 }
-                try manager.restoreSnapshot(item)
+                let requestedPath = filePath?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let fileToRestore = requestedPath?.isEmpty == false ? requestedPath : nil
+                try manager.restoreSnapshot(item, matching: fileToRestore)
                 await MainActor.run {
-                    statusMessage = "Restored snapshot from \(item.sourceMachineLabel)"
-                    viewModel.addActivityLog(message: "Restored snapshot: \(item.snapshot.name) from \(item.sourceMachineLabel)", type: .sync)
+                    if let fileToRestore {
+                        statusMessage = "Restored \(fileToRestore) from \(item.sourceMachineLabel)"
+                        viewModel.addActivityLog(message: "Restored file from snapshot: \(fileToRestore) from \(item.sourceMachineLabel)", type: .sync)
+                    } else {
+                        statusMessage = "Restored snapshot from \(item.sourceMachineLabel)"
+                        viewModel.addActivityLog(message: "Restored snapshot: \(item.snapshot.name) from \(item.sourceMachineLabel)", type: .sync)
+                    }
                 }
             } catch {
                 await MainActor.run {
@@ -201,10 +208,12 @@ struct SnapshotMachineOption: Identifiable {
 
 struct SnapshotRow: View {
     let item: SnapshotCatalogItem
-    let restoreAction: () -> Void
+    let restoreAction: (String?) -> Void
     let deleteAction: (() -> Void)?
     @State private var isHovering = false
     @State private var showingConfirm = false
+    @State private var showingFileRestore = false
+    @State private var filePathToRestore = ""
 
     private var snapshot: Snapshot { item.snapshot }
     
@@ -232,8 +241,19 @@ struct SnapshotRow: View {
             Spacer()
             
             HStack(spacing: 12) {
+                Button(action: { showingFileRestore = true }) {
+                    Label("Restore File", systemImage: "doc.badge.arrow.up")
+                        .fontWeight(.medium)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.indigo.opacity(0.2))
+                .foregroundStyle(.indigo)
+                .cornerRadius(8)
+
                 Button(action: { showingConfirm = true }) {
-                    Label("Restore", systemImage: "arrow.counterclockwise")
+                    Label("Restore All", systemImage: "arrow.counterclockwise")
                         .fontWeight(.medium)
                 }
                 .buttonStyle(.plain)
@@ -268,12 +288,41 @@ struct SnapshotRow: View {
             }
         }
         .confirmationDialog("Restore Snapshot?", isPresented: $showingConfirm) {
-            Button("Restore and Overwrite Local Files", role: .destructive) {
-                restoreAction()
+            Button("Restore All and Overwrite Local Files", role: .destructive) {
+                restoreAction(nil)
             }
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("This will replace your current local files with files from \(item.sourceMachineLabel). This action cannot be undone.")
+        }
+        .sheet(isPresented: $showingFileRestore) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Restore File")
+                    .font(.headline)
+                Text("Source: \(item.sourceMachineLabel)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField("Path in snapshot, e.g. ~/.zshrc", text: $filePathToRestore)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 360)
+                    .accessibilityIdentifier("snapshots.restoreFilePath")
+                HStack {
+                    Button("Cancel") {
+                        showingFileRestore = false
+                    }
+                    .buttonStyle(.bordered)
+                    Spacer()
+                    Button("Restore File", role: .destructive) {
+                        restoreAction(filePathToRestore)
+                        showingFileRestore = false
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(filePathToRestore.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .accessibilityIdentifier("snapshots.restoreFile")
+                }
+            }
+            .padding(28)
+            .frame(width: 420)
         }
     }
 }
