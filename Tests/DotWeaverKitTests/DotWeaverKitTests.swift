@@ -521,6 +521,34 @@ final class DotWeaverKitTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: second, encoding: .utf8), "changed-two\n")
     }
 
+    func testProviderSnapshotDiscoveryWorksWithoutMachineManifest() throws {
+        let tempRoot = try makeTemporaryDirectory()
+        let providerRoot = tempRoot.appendingPathComponent("Provider")
+        let target = tempRoot.appendingPathComponent(".zprofile")
+        let machine = MachineIdentity(
+            id: "manifest-missing-id",
+            hostname: "missing-manifest",
+            userName: "rausth",
+            osVersion: "Linux",
+            architecture: "aarch64",
+            createdAt: Date()
+        )
+        let snapshot = Snapshot(
+            name: "fallback-machine",
+            fileCount: 1,
+            machineID: machine.id,
+            entries: [SnapshotEntry(originalPath: target.path, relativeStoragePath: ".zprofile", isSecret: false)]
+        )
+        try writeProviderSnapshot(snapshot, machine: machine, providerRoot: providerRoot, contents: [".zprofile": "export FALLBACK=1\n"], includeMachineManifest: false)
+
+        let item = try XCTUnwrap(SnapshotManager().listSnapshotCatalog(providerRootPath: providerRoot.path, includeLocal: false).first)
+
+        XCTAssertEqual(item.sourceMachineID, "manifest-missing-id")
+        XCTAssertEqual(item.sourceMachineLabel, "Unknown machine (manifest)")
+        XCTAssertNil(item.machine)
+        XCTAssertEqual(item.snapshot.entries.first?.originalPath, target.path)
+    }
+
     func testAuditLogWritesHashChainFields() throws {
         let tempRoot = try makeTemporaryDirectory()
         setenv("DOTWEAVER_APP_SUPPORT_DIR", tempRoot.path, 1)
@@ -566,7 +594,8 @@ final class DotWeaverKitTests: XCTestCase {
         _ snapshot: Snapshot,
         machine: MachineIdentity,
         providerRoot: URL,
-        contents: [String: String]
+        contents: [String: String],
+        includeMachineManifest: Bool = true
     ) throws {
         let snapshotRoot = providerRoot
             .appendingPathComponent(".dotweaver/snapshots")
@@ -575,9 +604,11 @@ final class DotWeaverKitTests: XCTestCase {
         let filesRoot = snapshotRoot.appendingPathComponent("files")
         let machinesRoot = providerRoot.appendingPathComponent(".dotweaver/manifests/machines")
         try FileManager.default.createDirectory(at: filesRoot, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: machinesRoot, withIntermediateDirectories: true)
+        if includeMachineManifest {
+            try FileManager.default.createDirectory(at: machinesRoot, withIntermediateDirectories: true)
+            try JSONEncoder.pretty.encode(machine).write(to: machinesRoot.appendingPathComponent(machine.id + ".json"), options: .atomic)
+        }
         try JSONEncoder.pretty.encode(snapshot).write(to: snapshotRoot.appendingPathComponent("metadata.json"), options: .atomic)
-        try JSONEncoder.pretty.encode(machine).write(to: machinesRoot.appendingPathComponent(machine.id + ".json"), options: .atomic)
         for (relativePath, content) in contents {
             let url = filesRoot.appendingPathComponent(relativePath)
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)

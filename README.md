@@ -218,7 +218,8 @@ dw snapshot restore before-shell-change --machine intel1
 # Partial restore from a chosen source machine
 dw snapshot restore before-shell-change --machine linux-laptop --file ~/.zshrc
 
-# App UI: Snapshots -> source machine picker -> Restore File or Restore All
+# App UI: Snapshots -> source machine picker -> Show Files -> Restore File
+# App UI: Snapshots -> Restore Snapshot for a full snapshot restore
 ```
 
 ```bash

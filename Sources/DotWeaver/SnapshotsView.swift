@@ -212,67 +212,82 @@ struct SnapshotRow: View {
     let deleteAction: (() -> Void)?
     @State private var isHovering = false
     @State private var showingConfirm = false
-    @State private var showingFileRestore = false
+    @State private var showingCustomFileRestore = false
+    @State private var showingFiles = false
     @State private var filePathToRestore = ""
 
     private var snapshot: Snapshot { item.snapshot }
+    private var sortedEntries: [SnapshotEntry] {
+        snapshot.entries.sorted { lhs, rhs in
+            lhs.originalPath.localizedCaseInsensitiveCompare(rhs.originalPath) == .orderedAscending
+        }
+    }
     
     var body: some View {
-        HStack(spacing: 20) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(snapshot.name)
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(snapshot.name)
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                    
+                    HStack(spacing: 12) {
+                        Label("\(snapshot.fileCount) files", systemImage: "doc.on.doc")
+                        Label(item.sourceMachineLabel, systemImage: "desktopcomputer")
+                        Text(snapshot.date, style: .date)
+                        Text(snapshot.date, style: .time)
+                        Text(item.location.rawValue.capitalized)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(item.location == .local ? Color.green.opacity(0.15) : Color.purple.opacity(0.15))
+                            .clipShape(Capsule())
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                
+                Spacer()
                 
                 HStack(spacing: 12) {
-                    Label("\(snapshot.fileCount) files", systemImage: "doc.on.doc")
-                    Label(item.sourceMachineLabel, systemImage: "desktopcomputer")
-                    Text(snapshot.date, style: .date)
-                    Text(snapshot.date, style: .time)
-                    Text(item.location.rawValue.capitalized)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(item.location == .local ? Color.green.opacity(0.15) : Color.purple.opacity(0.15))
-                        .clipShape(Capsule())
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-            
-            Spacer()
-            
-            HStack(spacing: 12) {
-                Button(action: { showingFileRestore = true }) {
-                    Label("Restore File", systemImage: "doc.badge.arrow.up")
-                        .fontWeight(.medium)
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color.indigo.opacity(0.2))
-                .foregroundStyle(.indigo)
-                .cornerRadius(8)
-
-                Button(action: { showingConfirm = true }) {
-                    Label("Restore All", systemImage: "arrow.counterclockwise")
-                        .fontWeight(.medium)
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color.blue.opacity(0.2))
-                .foregroundStyle(.blue)
-                .cornerRadius(8)
-                
-                if let deleteAction {
-                    Button(action: deleteAction) {
-                        Image(systemName: "trash")
-                            .foregroundStyle(.red.opacity(0.7))
-                            .padding(8)
-                            .background(Color.red.opacity(0.1))
-                            .cornerRadius(8)
+                    Button(action: { withAnimation(.easeInOut(duration: 0.2)) { showingFiles.toggle() } }) {
+                        Label(showingFiles ? "Hide Files" : "Show Files", systemImage: "list.bullet.rectangle")
+                            .fontWeight(.medium)
                     }
                     .buttonStyle(.plain)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.indigo.opacity(0.2))
+                    .foregroundStyle(.indigo)
+                    .cornerRadius(8)
+                    .accessibilityIdentifier("snapshots.showFiles")
+
+                    Button(action: { showingConfirm = true }) {
+                        Label("Restore Snapshot", systemImage: "arrow.counterclockwise")
+                            .fontWeight(.medium)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.blue.opacity(0.2))
+                    .foregroundStyle(.blue)
+                    .cornerRadius(8)
+                    .accessibilityIdentifier("snapshots.restoreSnapshot")
+                    
+                    if let deleteAction {
+                        Button(action: deleteAction) {
+                            Image(systemName: "trash")
+                                .foregroundStyle(.red.opacity(0.7))
+                                .padding(8)
+                                .background(Color.red.opacity(0.1))
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
+            }
+
+            if showingFiles {
+                Divider().opacity(0.25)
+                snapshotFiles
             }
         }
         .padding(20)
@@ -288,16 +303,16 @@ struct SnapshotRow: View {
             }
         }
         .confirmationDialog("Restore Snapshot?", isPresented: $showingConfirm) {
-            Button("Restore All and Overwrite Local Files", role: .destructive) {
+            Button("Restore Entire Snapshot and Overwrite Local Files", role: .destructive) {
                 restoreAction(nil)
             }
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("This will replace your current local files with files from \(item.sourceMachineLabel). This action cannot be undone.")
         }
-        .sheet(isPresented: $showingFileRestore) {
+        .sheet(isPresented: $showingCustomFileRestore) {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Restore File")
+                Text("Restore File by Path")
                     .font(.headline)
                 Text("Source: \(item.sourceMachineLabel)")
                     .font(.caption)
@@ -308,13 +323,13 @@ struct SnapshotRow: View {
                     .accessibilityIdentifier("snapshots.restoreFilePath")
                 HStack {
                     Button("Cancel") {
-                        showingFileRestore = false
+                        showingCustomFileRestore = false
                     }
                     .buttonStyle(.bordered)
                     Spacer()
                     Button("Restore File", role: .destructive) {
                         restoreAction(filePathToRestore)
-                        showingFileRestore = false
+                        showingCustomFileRestore = false
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(filePathToRestore.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -324,5 +339,60 @@ struct SnapshotRow: View {
             .padding(28)
             .frame(width: 420)
         }
+    }
+
+    @ViewBuilder
+    private var snapshotFiles: some View {
+        if sortedEntries.isEmpty {
+            HStack {
+                Text("This snapshot has no file index. Restore by path if you know the file path.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Restore by Path") {
+                    showingCustomFileRestore = true
+                }
+                .buttonStyle(.bordered)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(sortedEntries, id: \.relativeStoragePath) { entry in
+                    SnapshotFileRow(entry: entry) {
+                        restoreAction(entry.originalPath)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct SnapshotFileRow: View {
+    let entry: SnapshotEntry
+    let restoreAction: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: entry.isSecret ? "lock.doc" : "doc")
+                .foregroundStyle(entry.isSecret ? .orange : .secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.originalPath)
+                    .font(.system(.caption, design: .monospaced))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(entry.relativeStoragePath)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer()
+            Button("Restore File", role: .destructive) {
+                restoreAction()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .accessibilityIdentifier("snapshots.restoreIndexedFile")
+        }
+        .padding(.vertical, 4)
     }
 }

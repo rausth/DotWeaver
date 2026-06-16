@@ -15,14 +15,14 @@
 | Git provider | Implemented | Local folder sync plus `git pull` / `git push` |
 | Conflict resolution | Implemented | Reads local and stored file copies; applies selected strategy |
 | CLI | Implemented | Files, sync, providers, native config, Git config, snapshots, source-machine restore, partial restore, conflicts, doctor, hooks, templates, interop, `dw plan`, and `dw status --diff` |
-| Snapshots | Implemented | Preserves nested paths, syncs snapshots to provider folder, restores local or provider-hosted snapshots from selected source machines, and supports `Restore File` or `Restore All` in the UI |
+| Snapshots | Implemented | Preserves nested paths, syncs snapshots to provider folder, restores local or provider-hosted snapshots from selected source machines, shows indexed files per snapshot, and supports per-file or full snapshot restore in the UI |
 | Machine/version manifests | Implemented | Machine identity, file manifest, per-file version records |
 | Vault encryption | Implemented | AES.GCM payloads, master key stored in Keychain, template vault placeholders |
 | Sensitive auth gates | Implemented | Vaulted sync, snapshot restore, credential reads |
 | Hook policy | Implemented | Hooks disabled by default, SHA-256 approved, path-contained, restricted-env, and audited when skipped/executed |
 | Audit log | Implemented | Rotation with hash-chain fields |
 | Ignore rules | Implemented | Provider-root `.dotignore` filtering for planning and sync |
-| Tests | Passing | 31 unit/integration tests cover core provider, vault, snapshot, provider-hosted source-machine restore, native endpoint safety, Git remote behavior, provider permissions, shared restore, interop parsing, ignore rules, hooks, templates, audit, and CLI planning |
+| Tests | Passing | 32 unit/integration tests cover core provider, vault, snapshot, provider-hosted source-machine restore, missing-manifest snapshot discovery, native endpoint safety, Git remote behavior, provider permissions, shared restore, interop parsing, ignore rules, hooks, templates, audit, and CLI planning |
 | Release packaging | Implemented | Universal app/CLI artifacts, Sparkle framework embedding, app icon resource bundle embedding, appcast generation, local signature/rpath verification |
 | Sparkle signing | Configured | GitHub Actions secrets are configured for `SPARKLE_PUBLIC_ED_KEY` and `SPARKLE_PRIVATE_KEY`; local signed-appcast validation passes |
 | Smoke validation | Implemented | Provider matrix, app launch, local appcast, signature, rpath, checksum, CLI help, real mounted-folder, and native endpoint validators |
