@@ -8,10 +8,16 @@
   <a href="https://github.com/rausth/DotWeaver/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/rausth/DotWeaver/ci.yml?branch=main&label=ci&style=flat-square"></a>
   <img alt="Version" src="https://img.shields.io/badge/version-1.0.0--85-blue?style=flat-square">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-green?style=flat-square"></a>
-  <img alt="Tests" src="https://img.shields.io/badge/tests-31%20passing-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-32%20passing-brightgreen?style=flat-square">
 </p>
 
 DotWeaver is a native macOS dotfiles manager for synchronizing development configuration across machines with a SwiftUI app, a `dw` CLI, provider-backed storage, encrypted vault files, snapshots, conflict resolution, and release packaging for GitHub/ad-hoc distribution.
+
+## Project Status
+
+Current version: `1.0.0-85`.
+
+DotWeaver is ready for GitHub/ad-hoc macOS distribution. The app, bundled CLI, provider storage model, source-machine snapshot restore, per-file snapshot restore UI, vault encryption, hook policy, audit log, release packaging, and smoke validation are implemented. Local validation currently passes with 32 unit/integration tests plus app launch smoke. Apple notarization is intentionally not enabled unless paid Apple Developer credentials are available.
 
 ```mermaid
 flowchart LR
@@ -25,6 +31,7 @@ flowchart LR
 
 ## Table of Contents
 
+- [Project Status](#project-status)
 - [Features](#features)
 - [Installation Matrix](#installation-matrix)
   - [Supported install paths](#supported-install-paths)
