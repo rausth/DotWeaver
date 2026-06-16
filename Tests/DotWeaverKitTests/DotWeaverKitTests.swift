@@ -390,6 +390,64 @@ final class DotWeaverKitTests: XCTestCase {
         )
     }
 
+    func testDotignoreMatcherSupportsGlobAndNegation() {
+        let matcher = DotignoreMatcher(contents: """
+        # comment
+        *.local
+        secrets/
+        !keep.local
+        """)
+
+        XCTAssertTrue(matcher.ignores(path: "~/config.local"))
+        XCTAssertTrue(matcher.ignores(path: "~/secrets/token"))
+        XCTAssertFalse(matcher.ignores(path: "~/keep.local"))
+        XCTAssertFalse(matcher.ignores(path: "~/config.toml"))
+    }
+
+    func testTemplateContextRendersMachineVariables() async throws {
+        let state = AppState(selectedProvider: .onedrive, cloudSyncPath: "/tmp/dotweaver")
+        let engine = TemplateEngine(context: .current(state: state))
+        let rendered = try await engine.render(template: "provider={{PROVIDER}} root={{sync_root}} arch={{ARCHITECTURE}}")
+        XCTAssertTrue(rendered.contains("provider=onedrive"))
+        XCTAssertTrue(rendered.contains("root=/tmp/dotweaver"))
+        XCTAssertFalse(rendered.contains("{{ARCHITECTURE}}"))
+    }
+
+    func testSnapshotCanRestoreSingleFile() throws {
+        let tempRoot = try makeTemporaryDirectory()
+        let first = tempRoot.appendingPathComponent(".first")
+        let second = tempRoot.appendingPathComponent(".second")
+        try "one\n".write(to: first, atomically: true, encoding: .utf8)
+        try "two\n".write(to: second, atomically: true, encoding: .utf8)
+
+        let manager = SnapshotManager()
+        let snapshot = try manager.createSnapshot(dotfiles: [Dotfile(path: first.path), Dotfile(path: second.path)], name: "partial-\(UUID().uuidString)")
+        try "changed-one\n".write(to: first, atomically: true, encoding: .utf8)
+        try "changed-two\n".write(to: second, atomically: true, encoding: .utf8)
+
+        try manager.restoreSnapshot(snapshot, matching: first.path)
+
+        XCTAssertEqual(try String(contentsOf: first, encoding: .utf8), "one\n")
+        XCTAssertEqual(try String(contentsOf: second, encoding: .utf8), "changed-two\n")
+    }
+
+    func testAuditLogWritesHashChainFields() throws {
+        let tempRoot = try makeTemporaryDirectory()
+        setenv("DOTWEAVER_APP_SUPPORT_DIR", tempRoot.path, 1)
+        defer { unsetenv("DOTWEAVER_APP_SUPPORT_DIR") }
+
+        SyncAuditLog.record("first")
+        SyncAuditLog.record("second")
+
+        let logURL = tempRoot.appendingPathComponent("audit.jsonl")
+        let lines = try String(contentsOf: logURL, encoding: .utf8).split(separator: "\n")
+        XCTAssertEqual(lines.count, 2)
+        let first = try JSONDecoder.dotWeaver.decode(AuditEntry.self, from: Data(lines[0].utf8))
+        let second = try JSONDecoder.dotWeaver.decode(AuditEntry.self, from: Data(lines[1].utf8))
+        XCTAssertFalse(first.entryHash.isEmpty)
+        XCTAssertEqual(second.previousHash, first.entryHash)
+    }
+
     private func makeTemporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("DotWeaverTests")

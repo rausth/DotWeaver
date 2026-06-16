@@ -167,21 +167,28 @@ public final class DotfilesViewModel: ObservableObject {
             }
         }
 
-        for dotfile in dotfiles {
+        let matcher = DotignoreMatcher.load(providerRootPath: currentProviderRootPath())
+        let syncableDotfiles = dotfiles.filter { dotfile in
+            guard matcher.ignores(path: dotfile.path) else { return true }
+            SyncAuditLog.record("Skipped ignored dotfile", metadata: ["file": dotfile.path])
+            return false
+        }
+
+        for dotfile in syncableDotfiles {
             if let hook = dotfile.preSyncHook, !hook.isEmpty {
                 executeHook(hook, phase: "pre-sync", filePath: dotfile.path)
             }
         }
         
         do {
-            let updated = try await provider.syncBidirectional(dotfiles: dotfiles)
-            self.dotfiles = updated
+            let updated = try await provider.syncBidirectional(dotfiles: syncableDotfiles)
+            self.dotfiles = mergeSyncedDotfiles(updated)
             statusMessage = "✅ Sync completed successfully"
             addActivityLog(message: "Synchronized with \(selectedProvider.title) from \(selectedSyncMachineLabel)", type: .sync)
             await refreshAvailableMachines()
             
             // Execute post-sync hooks
-            for dotfile in self.dotfiles {
+            for dotfile in updated {
                 if let hook = dotfile.postSyncHook, !hook.isEmpty {
                     executeHook(hook, phase: "post-sync", filePath: dotfile.path)
                 }
@@ -208,6 +215,13 @@ public final class DotfilesViewModel: ObservableObject {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/bin/zsh")
             process.arguments = [hookURL.path, filePath, phase]
+            process.environment = [
+                "HOME": FileManager.default.homeDirectoryForCurrentUser.path,
+                "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+                "SHELL": "/bin/zsh",
+                "DOTWEAVER_HOOK_PHASE": phase,
+                "DOTWEAVER_FILE_PATH": filePath
+            ]
 
             let outputPipe = Pipe()
             let errorPipe = Pipe()
@@ -233,18 +247,7 @@ public final class DotfilesViewModel: ObservableObject {
     }
 
     private func validatedHookScript(_ rawPath: String) throws -> URL {
-        let hookRoot = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".dotweaver/hooks", isDirectory: true)
-            .standardizedFileURL
-        let hookURL = URL(fileURLWithPath: (rawPath as NSString).expandingTildeInPath).standardizedFileURL
-        try SyncPathSecurity.validateLocalFile(hookURL)
-        try SyncPathSecurity.ensureContained(hookURL, in: hookRoot)
-
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: hookURL.path, isDirectory: &isDirectory), !isDirectory.boolValue else {
-            throw SyncError.fileNotFound(hookURL.path)
-        }
-        return hookURL
+        try HookApprovalStore.validateApproved(scriptPath: rawPath)
     }
     
     public func startWatchingDotfiles() {
@@ -281,6 +284,22 @@ public final class DotfilesViewModel: ObservableObject {
             recentActivity.removeLast()
         }
         // Save is handled by didSet
+    }
+
+    private func currentProviderRootPath() -> String? {
+        selectedProvider == .git ? gitLocalPath : cloudSyncPath
+    }
+
+    private func mergeSyncedDotfiles(_ synced: [Dotfile]) -> [Dotfile] {
+        var merged = dotfiles
+        for dotfile in synced {
+            if let index = merged.firstIndex(where: { $0.id == dotfile.id }) {
+                merged[index] = dotfile
+            } else {
+                merged.append(dotfile)
+            }
+        }
+        return merged
     }
 
     public func transportMode(for provider: SyncProvider) -> ProviderTransportMode {

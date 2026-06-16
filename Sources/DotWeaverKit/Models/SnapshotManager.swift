@@ -142,21 +142,15 @@ public final class SnapshotManager: Sendable {
     }
     
     public func restoreSnapshot(_ snapshot: Snapshot) throws {
+        try restoreSnapshot(snapshot, matching: nil)
+    }
+
+    public func restoreSnapshot(_ snapshot: Snapshot, matching requestedPath: String?) throws {
         let fm = FileManager.default
-        let folders = try fm.contentsOfDirectory(at: snapshotDir, includingPropertiesForKeys: nil)
-        guard let folder = folders.first(where: { folder in
-            let metadataUrl = folder.appendingPathComponent("metadata.json")
-            if let data = try? Data(contentsOf: metadataUrl),
-               let s = try? JSONDecoder().decode(Snapshot.self, from: data) {
-                return s.id == snapshot.id
-            }
-            return false
-        }) else {
-            throw NSError(domain: "SnapshotManager", code: 404, userInfo: [NSLocalizedDescriptionKey: "Snapshot folder not found"])
-        }
-        
+        let folder = try snapshotFolder(for: snapshot)
         let filesFolder = folder.appendingPathComponent("files")
-        for entry in snapshot.entries {
+        let entries = try entriesToRestore(from: snapshot, matching: requestedPath)
+        for entry in entries {
             let fileUrl = filesFolder.appendingPathComponent(entry.relativeStoragePath)
             let destination = URL(fileURLWithPath: entry.originalPath)
             try SyncPathSecurity.validateLocalFile(destination)
@@ -169,23 +163,45 @@ public final class SnapshotManager: Sendable {
             try SyncPathSecurity.writeFileAtomically(data, to: destination)
         }
 
-        SyncAuditLog.record("Restored snapshot", metadata: ["name": snapshot.name, "files": "\(snapshot.fileCount)"])
+        SyncAuditLog.record("Restored snapshot", metadata: ["name": snapshot.name, "files": "\(entries.count)"])
     }
     
     public func deleteSnapshot(_ snapshot: Snapshot) throws {
-        let fm = FileManager.default
-        let folders = try fm.contentsOfDirectory(at: snapshotDir, includingPropertiesForKeys: nil)
-        if let folder = folders.first(where: { folder in
+        if let folder = try? snapshotFolder(for: snapshot) {
+            try FileManager.default.removeItem(at: folder)
+            SyncAuditLog.record("Deleted snapshot", metadata: ["name": snapshot.name])
+        }
+    }
+
+    private func snapshotFolder(for snapshot: Snapshot) throws -> URL {
+        let folders = try FileManager.default.contentsOfDirectory(at: snapshotDir, includingPropertiesForKeys: nil)
+        guard let folder = folders.first(where: { folder in
             let metadataUrl = folder.appendingPathComponent("metadata.json")
             if let data = try? Data(contentsOf: metadataUrl),
                let s = try? JSONDecoder().decode(Snapshot.self, from: data) {
                 return s.id == snapshot.id
             }
             return false
-        }) {
-            try fm.removeItem(at: folder)
-            SyncAuditLog.record("Deleted snapshot", metadata: ["name": snapshot.name])
+        }) else {
+            throw NSError(domain: "SnapshotManager", code: 404, userInfo: [NSLocalizedDescriptionKey: "Snapshot folder not found"])
         }
+        return folder
+    }
+
+    private func entriesToRestore(from snapshot: Snapshot, matching requestedPath: String?) throws -> [SnapshotEntry] {
+        guard let requestedPath, !requestedPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return snapshot.entries
+        }
+        let expanded = URL(fileURLWithPath: (requestedPath as NSString).expandingTildeInPath).standardizedFileURL.path
+        let matches = snapshot.entries.filter {
+            URL(fileURLWithPath: ($0.originalPath as NSString).expandingTildeInPath).standardizedFileURL.path == expanded ||
+            $0.originalPath == requestedPath ||
+            $0.relativeStoragePath == requestedPath
+        }
+        guard !matches.isEmpty else {
+            throw NSError(domain: "SnapshotManager", code: 404, userInfo: [NSLocalizedDescriptionKey: "File not found in snapshot: \(requestedPath)"])
+        }
+        return matches
     }
 
     private func syncSnapshotFolder(_ snapshotFolder: URL, snapshot: Snapshot, providerRootPath: String) throws {
