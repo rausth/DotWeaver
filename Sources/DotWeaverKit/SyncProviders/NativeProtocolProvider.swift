@@ -2,6 +2,7 @@ import Foundation
 
 final class NativeProtocolProvider: SyncProviderProtocol {
     let name: SyncProvider
+    let capabilities: SyncProviderCapabilities = [.managedFileSync]
 
     private let configProvider: () -> NativeProviderConfig
     private let sourceMachineIDProvider: () -> String
@@ -71,18 +72,6 @@ final class NativeProtocolProvider: SyncProviderProtocol {
 
     func sync(dotfiles: [Dotfile]) async throws {
         _ = try await syncBidirectional(dotfiles: dotfiles)
-    }
-
-    func pull() async throws {
-        throw SyncError.configurationMissing("Native pull requires managed dotfile metadata")
-    }
-
-    func push() async throws {
-        throw SyncError.configurationMissing("Native push requires managed dotfile metadata")
-    }
-
-    func status() async throws -> [Dotfile] {
-        []
     }
 
     private func resolvedSourceMachineID(currentMachineID: String) -> String {

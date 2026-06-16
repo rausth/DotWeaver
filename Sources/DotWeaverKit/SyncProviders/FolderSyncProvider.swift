@@ -2,6 +2,7 @@ import Foundation
 
 final class FolderSyncProvider: SyncProviderProtocol {
     let name: SyncProvider
+    let capabilities: SyncProviderCapabilities = [.managedFileSync, .machineDiscovery]
 
     private let storageRootProvider: () -> String
     private let sourceMachineIDProvider: () -> String
@@ -77,18 +78,6 @@ final class FolderSyncProvider: SyncProviderProtocol {
 
     func sync(dotfiles: [Dotfile]) async throws {
         _ = try await syncBidirectional(dotfiles: dotfiles)
-    }
-
-    func pull() async throws {
-        throw SyncError.configurationMissing("Pull requires managed dotfile metadata")
-    }
-
-    func push() async throws {
-        throw SyncError.configurationMissing("Push requires managed dotfile metadata")
-    }
-
-    func status() async throws -> [Dotfile] {
-        []
     }
 
     func listMachines() async throws -> [MachineIdentity] {

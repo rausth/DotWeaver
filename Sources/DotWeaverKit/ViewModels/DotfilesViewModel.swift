@@ -23,6 +23,8 @@ public final class DotfilesViewModel: ObservableObject {
 
     private let providers: [SyncProvider: SyncProviderProtocol]
     private var watchers: [String: FileWatcher] = [:]
+    private var isLoadingState = false
+    private var securityScopedBookmarks: [String: Data] = [:]
 
     public convenience init() {
         let defaultProviders: [SyncProvider: SyncProviderProtocol] = [
@@ -45,27 +47,28 @@ public final class DotfilesViewModel: ObservableObject {
     }
 
     public func save() {
-        let state = AppState(
-            dotfiles: dotfiles,
-            selectedProvider: selectedProvider,
-            recentActivity: recentActivity,
-            cloudSyncPath: cloudSyncPath,
-            gitLocalPath: gitLocalPath,
-            gitRemoteUrl: gitRemoteUrl,
-            gitBranch: gitBranch,
-            gitSshKeyPath: gitSshKeyPath,
-            gitHost: gitHost,
-            providerTransportModes: providerTransportModes,
-            nativeProviderConfigs: nativeProviderConfigs,
-            selectedSyncMachineID: selectedSyncMachineID,
-            securityScopedBookmarks: StateManager.loadState().securityScopedBookmarks
-        )
-        StateManager.saveState(state)
+        guard !isLoadingState else { return }
+        StateManager.saveState(currentState())
     }
 
     private func load() {
         let state = StateManager.loadState()
+        isLoadingState = true
+        apply(state)
+        isLoadingState = false
+        self.availableMachines = (try? [MachineIdentity.current()]) ?? []
+        SecurityScopedBookmarks.restoreAccess()
         
+        // Add a log entry for startup if it's not a fresh state
+        if !state.recentActivity.isEmpty {
+             addActivityLog(message: "DotWeaver loaded previous state", type: .system)
+        }
+       
+        // Ensure watchers are active on load
+        startWatchingDotfiles()
+    }
+
+    private func apply(_ state: AppState) {
         self.dotfiles = state.dotfiles
         self.selectedProvider = state.selectedProvider
         self.recentActivity = state.recentActivity
@@ -78,16 +81,32 @@ public final class DotfilesViewModel: ObservableObject {
         self.providerTransportModes = state.providerTransportModes
         self.nativeProviderConfigs = state.nativeProviderConfigs
         self.selectedSyncMachineID = state.selectedSyncMachineID
-        self.availableMachines = (try? [MachineIdentity.current()]) ?? []
-        SecurityScopedBookmarks.restoreAccess()
-        
-        // Add a log entry for startup if it's not a fresh state
-        if !state.recentActivity.isEmpty {
-             addActivityLog(message: "DotWeaver loaded previous state", type: .system)
-        }
-       
-        // Ensure watchers are active on load
-        startWatchingDotfiles()
+        self.securityScopedBookmarks = state.securityScopedBookmarks
+    }
+
+    private func currentState() -> AppState {
+        AppState(
+            dotfiles: dotfiles,
+            selectedProvider: selectedProvider,
+            recentActivity: recentActivity,
+            cloudSyncPath: cloudSyncPath,
+            gitLocalPath: gitLocalPath,
+            gitRemoteUrl: gitRemoteUrl,
+            gitBranch: gitBranch,
+            gitSshKeyPath: gitSshKeyPath,
+            gitHost: gitHost,
+            providerTransportModes: providerTransportModes,
+            nativeProviderConfigs: nativeProviderConfigs,
+            selectedSyncMachineID: selectedSyncMachineID,
+            securityScopedBookmarks: mergedSecurityScopedBookmarks()
+        )
+    }
+
+    private func mergedSecurityScopedBookmarks() -> [String: Data] {
+        var bookmarks = securityScopedBookmarks
+        StateManager.loadState().securityScopedBookmarks.forEach { bookmarks[$0.key] = $0.value }
+        securityScopedBookmarks = bookmarks
+        return bookmarks
     }
 
     public var selectedSyncMachineLabel: String {
@@ -102,7 +121,7 @@ public final class DotfilesViewModel: ObservableObject {
     }
 
     public func refreshAvailableMachines() async {
-        guard let provider = providers[selectedProvider] else {
+        guard let provider = providers[selectedProvider], provider.capabilities.contains(.machineDiscovery) else {
             availableMachines = (try? [MachineIdentity.current()]) ?? []
             return
         }

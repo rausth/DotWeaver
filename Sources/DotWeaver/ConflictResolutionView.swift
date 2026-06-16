@@ -68,17 +68,28 @@ struct ConflictResolutionView: View {
                     if let file = selectedFile {
                         VStack(spacing: 0) {
                             // Diff Viewer Header
-                            HStack {
-                                Text("Comparison Diff")
-                                    .font(.headline)
-                                Spacer()
-                                Picker("Strategy", selection: $resolution) {
-                                    ForEach(ConflictStrategy.allCases, id: \.self) { strategy in
-                                        Text(strategy.description).tag(strategy)
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Comparison Diff")
+                                            .font(.headline)
+                                        Text(diffSummary(for: file))
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
                                     }
+                                    Spacer()
+                                    Picker("Strategy", selection: $resolution) {
+                                        ForEach(ConflictStrategy.allCases, id: \.self) { strategy in
+                                            Text(strategy.description).tag(strategy)
+                                        }
+                                    }
+                                    .pickerStyle(.menu)
+                                    .frame(width: 250)
+                                    .accessibilityLabel("Conflict resolution strategy")
                                 }
-                                .pickerStyle(.menu)
-                                .frame(width: 250)
+                                Text(strategyHelpText)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
                             .padding()
                             .background(Color.black.opacity(0.1))
@@ -88,13 +99,23 @@ struct ConflictResolutionView: View {
                             // Diff Viewer Content
                             GeometryReader { geometry in
                                 HStack(spacing: 0) {
-                                    DiffPanel(title: "Local Version", content: localContent(for: file), color: .blue)
-                                        .frame(width: geometry.size.width / 2)
+                                    DiffPanel(
+                                        title: "Local Version",
+                                        content: localContent(for: file),
+                                        comparisonContent: storedContent(for: file),
+                                        color: .blue
+                                    )
+                                    .frame(width: geometry.size.width / 2)
                                     
                                     Divider().opacity(0.5)
                                     
-                                    DiffPanel(title: "Stored Version", content: storedContent(for: file), color: .purple)
-                                        .frame(width: geometry.size.width / 2)
+                                    DiffPanel(
+                                        title: "Stored Version",
+                                        content: storedContent(for: file),
+                                        comparisonContent: localContent(for: file),
+                                        color: .purple
+                                    )
+                                    .frame(width: geometry.size.width / 2)
                                 }
                             }
                             
@@ -106,11 +127,15 @@ struct ConflictResolutionView: View {
                                 Button("Cancel") {
                                     selectedFile = nil
                                 }
+                                .keyboardShortcut(.cancelAction)
                                 Button("Apply Resolution") {
                                     applyResolution(for: file)
                                 }
                                 .buttonStyle(.borderedProminent)
                                 .tint(.blue)
+                                .disabled(resolution == .manual)
+                                .keyboardShortcut(.defaultAction)
+                                .accessibilityLabel("Apply selected conflict resolution")
                             }
                             .padding()
                             .background(Color.black.opacity(0.1))
@@ -175,6 +200,26 @@ struct ConflictResolutionView: View {
                 userInfo: [NSLocalizedDescriptionKey: "Select a concrete resolution strategy before applying."]
             )
         }
+    }
+
+    private var strategyHelpText: String {
+        switch resolution {
+        case .localWins:
+            return "Local version will overwrite the stored version."
+        case .remoteWins:
+            return "Stored version will restore over the local file."
+        case .lastModifiedWins:
+            return "The newest file by modification date will be kept."
+        case .manual:
+            return "Manual merge is not applied automatically. Edit one side, then choose a concrete strategy."
+        }
+    }
+
+    private func diffSummary(for file: Dotfile) -> String {
+        let local = localContent(for: file).splitForDiff()
+        let stored = storedContent(for: file).splitForDiff()
+        let changed = zipPadded(local, stored).filter { $0 != $1 }.count
+        return "\(changed) changed line(s) • \(local.count) local / \(stored.count) stored"
     }
 
     private func localContent(for file: Dotfile) -> String {
@@ -250,27 +295,88 @@ struct ConflictResolutionView: View {
 struct DiffPanel: View {
     let title: String
     let content: String
+    let comparisonContent: String
     let color: Color
+
+    private var lines: [DiffLine] {
+        let current = content.splitForDiff()
+        let comparison = comparisonContent.splitForDiff()
+        return zipPadded(current, comparison).enumerated().map { index, pair in
+            DiffLine(number: index + 1, text: pair.0, isChanged: pair.0 != pair.1)
+        }
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .font(.caption)
-                .fontWeight(.bold)
-                .foregroundStyle(color)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(color.opacity(0.1))
+            HStack {
+                Text(title)
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundStyle(color)
+                Spacer()
+                Text("\(lines.filter(\.isChanged).count) changed")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(color.opacity(0.1))
             
             ScrollView {
-                Text(content)
-                    .font(.system(size: 13, design: .monospaced))
-                    .foregroundStyle(.primary.opacity(0.8))
-                    .padding(16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(lines) { line in
+                        DiffLineRow(line: line, color: color)
+                    }
+                }
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .accessibilityLabel("\(title) diff")
         }
         .background(Color.black.opacity(0.2))
+    }
+}
+
+private struct DiffLine: Identifiable {
+    let id = UUID()
+    let number: Int
+    let text: String
+    let isChanged: Bool
+}
+
+private struct DiffLineRow: View {
+    let line: DiffLine
+    let color: Color
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text("\(line.number)")
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .frame(width: 42, alignment: .trailing)
+                .textSelection(.enabled)
+            Text(line.text.isEmpty ? " " : line.text)
+                .font(.system(size: 13, design: .monospaced))
+                .foregroundStyle(.primary.opacity(0.85))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 2)
+        .background(line.isChanged ? color.opacity(0.16) : Color.clear)
+    }
+}
+
+private func zipPadded(_ left: [String], _ right: [String]) -> [(String, String)] {
+    let count = max(left.count, right.count)
+    return (0..<count).map { index in
+        (index < left.count ? left[index] : "", index < right.count ? right[index] : "")
+    }
+}
+
+private extension String {
+    func splitForDiff() -> [String] {
+        components(separatedBy: .newlines)
     }
 }
