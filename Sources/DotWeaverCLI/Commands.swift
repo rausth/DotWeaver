@@ -24,7 +24,7 @@ struct CLICommands {
             case "provider": try provider(args)
             case "git": try await git(args)
             case "native": try native(args)
-            case "snapshot", "snapshots": try await snapshot(args)
+            case "snapshot", "snapshots", "backup", "backups": try await snapshot(args)
             case "doctor": doctor()
             case "metadata": try metadata(args)
             case "hooks": try hooks(args)
@@ -76,12 +76,13 @@ struct CLICommands {
           dw git push
           dw git status
 
-        Snapshots/conflicts:
-          dw snapshot machines
-          dw snapshot list [--machine <id-or-hostname>]
-          dw snapshot create <name>
-          dw snapshot restore <id-or-name> [--machine <id-or-hostname>] [--file <path>]
-          dw snapshot delete <id-or-name>
+        Backups/snapshots/conflicts:
+          dw backup machines
+          dw backup list [--machine <id-or-hostname>]
+          dw backup create <name>
+          dw backup restore <id-or-name> [--machine <id-or-hostname>] [--file <path>]
+          dw backup delete <id-or-name>
+          dw snapshot <same commands as backup>
           dw conflicts list
           dw conflicts resolve <file> <local|stored|newest>
 

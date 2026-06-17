@@ -8,7 +8,8 @@ DotWeaver is a macOS app for keeping project dotfiles organized, monitored, and 
 
 - Monitors selected dotfiles and configuration files from one desktop app.
 - Shows pending changes and recent sync activity from the dashboard.
-- Provides snapshot support so configuration states can be reviewed or restored.
+- Supports scheduled automatic sync with optional pre-sync backups.
+- Provides backup/snapshot support so configuration states can be reviewed or restored.
 - Includes a template gallery for common dotfile setups.
 - Supports cloud sync providers from the app settings.
 - Includes a system doctor for checking app and sync health.
@@ -27,7 +28,7 @@ DotWeaver is designed around a sidebar-driven macOS interface:
 
 ## Platform
 
-DotWeaver is a native macOS app.
+DotWeaver is a native macOS app. A Linux-native version is planned as a CLI-first port with platform adapters for credentials, scheduling, and packaging.
 
 ## Development
 

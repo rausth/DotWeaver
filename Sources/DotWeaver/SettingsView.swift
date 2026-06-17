@@ -8,8 +8,6 @@ struct SettingsView: View {
     @AppStorage("biometricEnabled") private var biometricEnabled: Bool = true
     @AppStorage("hooksEnabled") private var hooksEnabled: Bool = false
     
-    @State private var autoSyncEnabled: Bool = true
-    @State private var syncInterval: Double = 300 // 5 minutes
     @State private var notificationsEnabled: Bool = true
     
     var body: some View {
@@ -34,18 +32,34 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Toggle("Enable automatic sync", isOn: $autoSyncEnabled)
+                    Toggle("Enable automatic sync", isOn: scheduleEnabledBinding)
                         .toggleStyle(.switch)
                         .accessibilityLabel("Enable automatic sync")
                     
-                    if autoSyncEnabled {
+                    if viewModel.syncSchedule.enabled {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Sync interval: \(Int(syncInterval/60)) minutes")
+                            Text("Sync interval: \(Int(viewModel.syncSchedule.intervalSeconds / 60)) minutes")
                                 .foregroundStyle(.secondary)
-                            Slider(value: $syncInterval, in: 60...3600, step: 60)
+                            Slider(value: scheduleIntervalBinding, in: 60...3600, step: 60)
                                 .tint(.blue)
                                 .accessibilityLabel("Sync interval")
-                                .accessibilityValue("\(Int(syncInterval / 60)) minutes")
+                                .accessibilityValue("\(Int(viewModel.syncSchedule.intervalSeconds / 60)) minutes")
+
+                            Toggle("Create backup before automatic sync", isOn: scheduleBackupBinding)
+                                .toggleStyle(.switch)
+                                .accessibilityLabel("Create backup before automatic sync")
+
+                            if let lastRun = viewModel.syncSchedule.lastRunAt {
+                                Text("Last automatic sync: \(lastRun.formatted(date: .abbreviated, time: .shortened))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            if let lastError = viewModel.syncSchedule.lastError, !lastError.isEmpty {
+                                Text("Last error: \(lastError)")
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                            }
                         }
                         .padding(.leading, 24)
                         .padding(.top, 4)
@@ -351,6 +365,39 @@ struct SettingsView: View {
         .frame(width: 550, height: 450)
     }
     
+    private var scheduleEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.syncSchedule.enabled },
+            set: {
+                var schedule = viewModel.syncSchedule
+                schedule.enabled = $0
+                viewModel.syncSchedule = schedule
+            }
+        )
+    }
+
+    private var scheduleIntervalBinding: Binding<Double> {
+        Binding(
+            get: { viewModel.syncSchedule.intervalSeconds },
+            set: {
+                var schedule = viewModel.syncSchedule
+                schedule.intervalSeconds = max($0, SyncSchedule.minimumIntervalSeconds)
+                viewModel.syncSchedule = schedule
+            }
+        )
+    }
+
+    private var scheduleBackupBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.syncSchedule.createBackupBeforeSync },
+            set: {
+                var schedule = viewModel.syncSchedule
+                schedule.createBackupBeforeSync = $0
+                viewModel.syncSchedule = schedule
+            }
+        )
+    }
+
     private func selectCloudFolder() {
         #if os(macOS)
         let panel = NSOpenPanel()

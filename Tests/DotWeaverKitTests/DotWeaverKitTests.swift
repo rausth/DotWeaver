@@ -413,6 +413,21 @@ final class DotWeaverKitTests: XCTestCase {
         XCTAssertFalse(rendered.contains("{{ARCHITECTURE}}"))
     }
 
+    func testAppStateDefaultsToDisabledScheduledSync() throws {
+        let data = try JSONEncoder().encode(AppState())
+        let decoded = try JSONDecoder().decode(AppState.self, from: data)
+
+        XCTAssertFalse(decoded.syncSchedule.enabled)
+        XCTAssertEqual(decoded.syncSchedule.intervalSeconds, 300)
+        XCTAssertTrue(decoded.syncSchedule.createBackupBeforeSync)
+    }
+
+    func testSyncScheduleEnforcesMinimumInterval() {
+        let schedule = SyncSchedule(enabled: true, intervalSeconds: 5)
+
+        XCTAssertEqual(schedule.intervalSeconds, SyncSchedule.minimumIntervalSeconds)
+    }
+
     func testSnapshotCanRestoreSingleFile() throws {
         let tempRoot = try makeTemporaryDirectory()
         let first = tempRoot.appendingPathComponent(".first")

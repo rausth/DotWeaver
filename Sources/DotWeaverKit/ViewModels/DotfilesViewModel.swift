@@ -20,6 +20,7 @@ public final class DotfilesViewModel: ObservableObject {
     @Published public var nativeProviderConfigs: [SyncProvider: NativeProviderConfig] = [:] { didSet { save() } }
     @Published public var selectedSyncMachineID: String = "" { didSet { save() } }
     @Published public var availableMachines: [MachineIdentity] = []
+    @Published public var syncSchedule: SyncSchedule = SyncSchedule() { didSet { save(); configureSyncScheduler() } }
 
     private let providers: [SyncProvider: SyncProviderProtocol]
     private var watchers: [String: FileWatcher] = [:]
@@ -28,6 +29,9 @@ public final class DotfilesViewModel: ObservableObject {
     private var pendingSaveTask: Task<Void, Never>?
     private var pendingChangedPaths: Set<String> = []
     private var pendingChangeTask: Task<Void, Never>?
+    private lazy var syncScheduler = SyncScheduler { [weak self] in
+        await self?.syncFromSchedule()
+    }
 
     public convenience init() {
         let defaultProviders: [SyncProvider: SyncProviderProtocol] = [
@@ -79,6 +83,7 @@ public final class DotfilesViewModel: ObservableObject {
        
         // Ensure watchers are active on load
         startWatchingDotfiles()
+        configureSyncScheduler()
     }
 
     private func apply(_ state: AppState) {
@@ -95,6 +100,7 @@ public final class DotfilesViewModel: ObservableObject {
         self.nativeProviderConfigs = state.nativeProviderConfigs
         self.selectedSyncMachineID = state.selectedSyncMachineID
         self.securityScopedBookmarks = state.securityScopedBookmarks
+        self.syncSchedule = state.syncSchedule
     }
 
     private func currentState() -> AppState {
@@ -111,7 +117,8 @@ public final class DotfilesViewModel: ObservableObject {
             providerTransportModes: providerTransportModes,
             nativeProviderConfigs: nativeProviderConfigs,
             selectedSyncMachineID: selectedSyncMachineID,
-            securityScopedBookmarks: mergedSecurityScopedBookmarks()
+            securityScopedBookmarks: mergedSecurityScopedBookmarks(),
+            syncSchedule: syncSchedule
         )
     }
 
@@ -158,12 +165,41 @@ public final class DotfilesViewModel: ObservableObject {
     }
     
     public func syncBidirectional() async {
+        await runSync(isScheduled: false)
+    }
+
+    private func syncFromSchedule() async {
+        await runSync(isScheduled: true)
+    }
+
+    private func runSync(isScheduled: Bool) async {
+        guard !isSyncing else {
+            if isScheduled {
+                addActivityLog(message: "Skipped scheduled sync because another sync is running", type: .system)
+                SyncAuditLog.record("Skipped scheduled sync", metadata: ["reason": "sync already running"])
+            }
+            return
+        }
         isSyncing = true
         defer { isSyncing = false }
         
         guard let provider = providers[selectedProvider] else {
             statusMessage = "Provider not available"
+            recordScheduledResult(error: statusMessage, isScheduled: isScheduled)
             return
+        }
+
+        if isScheduled && syncSchedule.createBackupBeforeSync {
+            do {
+                let name = "Auto Backup \(Self.backupDateFormatter.string(from: Date()))"
+                _ = try SnapshotManager().createSnapshot(dotfiles: dotfiles, name: name, providerRootPath: currentProviderRootPath())
+                addActivityLog(message: "Created pre-sync backup: \(name)", type: .add)
+            } catch {
+                statusMessage = "❌ Scheduled backup failed: \(error.localizedDescription)"
+                SyncAuditLog.record("Scheduled backup failed", metadata: ["error": error.localizedDescription])
+                recordScheduledResult(error: statusMessage, isScheduled: isScheduled)
+                return
+            }
         }
         
         if dotfiles.contains(where: \.isSecret), SecurityPolicy.requiresBiometricAuthentication {
@@ -174,6 +210,7 @@ public final class DotfilesViewModel: ObservableObject {
             } catch {
                 statusMessage = "❌ Authentication failed: \(error.localizedDescription)"
                 SyncAuditLog.record("Biometric authentication failed for vaulted sync")
+                recordScheduledResult(error: statusMessage, isScheduled: isScheduled)
                 return
             }
         }
@@ -206,13 +243,34 @@ public final class DotfilesViewModel: ObservableObject {
             }
             
             startWatchingDotfiles()
+            recordScheduledResult(error: nil, isScheduled: isScheduled)
             save()
         } catch {
             statusMessage = "❌ Sync failed: \(error.localizedDescription)"
             SyncAuditLog.record("Sync failed", metadata: ["provider": selectedProvider.rawValue, "error": error.localizedDescription])
+            recordScheduledResult(error: error.localizedDescription, isScheduled: isScheduled)
         }
     }
     
+    private func configureSyncScheduler() {
+        guard !isLoadingState else { return }
+        syncScheduler.configure(schedule: syncSchedule)
+    }
+
+    private func recordScheduledResult(error: String?, isScheduled: Bool) {
+        guard isScheduled else { return }
+        var updated = syncSchedule
+        updated.lastRunAt = Date()
+        updated.lastError = error
+        syncSchedule = updated
+    }
+
+    private static let backupDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter
+    }()
+
     private func executeHook(_ command: String, phase: String, filePath: String) {
         guard SecurityPolicy.hooksEnabled else {
             addActivityLog(message: "Skipped disabled \(phase) hook for \((filePath as NSString).lastPathComponent)", type: .system)

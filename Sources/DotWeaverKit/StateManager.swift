@@ -1,5 +1,29 @@
 import Foundation
 
+public struct SyncSchedule: Codable, Hashable, Sendable {
+    public static let minimumIntervalSeconds: TimeInterval = 60
+
+    public var enabled: Bool
+    public var intervalSeconds: TimeInterval
+    public var createBackupBeforeSync: Bool
+    public var lastRunAt: Date?
+    public var lastError: String?
+
+    public init(
+        enabled: Bool = false,
+        intervalSeconds: TimeInterval = 300,
+        createBackupBeforeSync: Bool = true,
+        lastRunAt: Date? = nil,
+        lastError: String? = nil
+    ) {
+        self.enabled = enabled
+        self.intervalSeconds = max(intervalSeconds, Self.minimumIntervalSeconds)
+        self.createBackupBeforeSync = createBackupBeforeSync
+        self.lastRunAt = lastRunAt
+        self.lastError = lastError
+    }
+}
+
 public struct AppState: Codable {
     public var dotfiles: [Dotfile]
     public var selectedProvider: SyncProvider
@@ -14,6 +38,7 @@ public struct AppState: Codable {
     public var nativeProviderConfigs: [SyncProvider: NativeProviderConfig]
     public var selectedSyncMachineID: String
     public var securityScopedBookmarks: [String: Data]
+    public var syncSchedule: SyncSchedule
 
     public init(
         dotfiles: [Dotfile] = [],
@@ -28,7 +53,8 @@ public struct AppState: Codable {
         providerTransportModes: [SyncProvider: ProviderTransportMode] = [:],
         nativeProviderConfigs: [SyncProvider: NativeProviderConfig] = [:],
         selectedSyncMachineID: String = "",
-        securityScopedBookmarks: [String: Data] = [:]
+        securityScopedBookmarks: [String: Data] = [:],
+        syncSchedule: SyncSchedule = SyncSchedule()
     ) {
         self.dotfiles = dotfiles
         self.selectedProvider = selectedProvider
@@ -43,6 +69,7 @@ public struct AppState: Codable {
         self.nativeProviderConfigs = nativeProviderConfigs
         self.selectedSyncMachineID = selectedSyncMachineID
         self.securityScopedBookmarks = securityScopedBookmarks
+        self.syncSchedule = syncSchedule
     }
 
     enum CodingKeys: String, CodingKey {
@@ -59,6 +86,7 @@ public struct AppState: Codable {
         case nativeProviderConfigs
         case selectedSyncMachineID
         case securityScopedBookmarks
+        case syncSchedule
     }
 
     public init(from decoder: Decoder) throws {
@@ -76,6 +104,7 @@ public struct AppState: Codable {
         self.nativeProviderConfigs = try container.decodeIfPresent([SyncProvider: NativeProviderConfig].self, forKey: .nativeProviderConfigs) ?? [:]
         self.selectedSyncMachineID = try container.decodeIfPresent(String.self, forKey: .selectedSyncMachineID) ?? ""
         self.securityScopedBookmarks = try container.decodeIfPresent([String: Data].self, forKey: .securityScopedBookmarks) ?? [:]
+        self.syncSchedule = try container.decodeIfPresent(SyncSchedule.self, forKey: .syncSchedule) ?? SyncSchedule()
     }
 }
 
