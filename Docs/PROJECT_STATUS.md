@@ -1,7 +1,7 @@
 # DotWeaver Project Status
 
 **Date:** June 16, 2026
-**Version:** 1.0.0
+**Version:** 1.0.1
 **Status:** Ready for GitHub/ad-hoc distribution with passing CI, Pages, release workflow, signed Sparkle appcast generation, and local release validation. Apple notarization still requires external Apple Developer credentials.
 
 ## Current Implementation

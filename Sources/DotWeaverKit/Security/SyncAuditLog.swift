@@ -50,17 +50,30 @@ public enum SyncAuditLog {
     }
 
     private static func lastEntryHash(at url: URL) -> String? {
-        guard let data = try? Data(contentsOf: url),
-              let text = String(data: data, encoding: .utf8) else { return nil }
-        return text
-            .split(separator: "\n")
-            .reversed()
-            .compactMap { line -> String? in
-                guard let data = line.data(using: .utf8),
-                      let entry = try? JSONDecoder.dotWeaver.decode(AuditEntry.self, from: data) else { return nil }
-                return entry.entryHash
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        do {
+            let handle = try FileHandle(forReadingFrom: url)
+            defer { try? handle.close() }
+            let size = try handle.seekToEnd()
+            if size == 0 { return nil }
+            let tail = min(UInt64(4096), size)
+            try handle.seek(toOffset: size - tail)
+            let data = (try handle.read(upToCount: Int(tail))) ?? Data()
+            guard let text = String(data: data, encoding: .utf8), !text.isEmpty else { return nil }
+            // Walk backwards over lines in the tail to find the last valid AuditEntry.
+            // The first segment in the tail may be a partial line from before the window; ignore it.
+            let lines = text.split(separator: "\n")
+            for line in lines.reversed() {
+                let s = String(line).trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !s.isEmpty, let lineData = s.data(using: .utf8) else { continue }
+                if let entry = try? JSONDecoder.dotWeaver.decode(AuditEntry.self, from: lineData) {
+                    return entry.entryHash
+                }
             }
-            .first
+            return nil
+        } catch {
+            return nil
+        }
     }
 
     private static func auditURL() -> URL {

@@ -41,7 +41,7 @@ struct LicenseView: View {
                         .font(.largeTitle)
                         .fontWeight(.heavy)
                     
-                    Text("Version 1.0.0")
+                    Text("Version 1.0.1")
                         .foregroundStyle(.secondary)
                         .font(.subheadline)
                 }

@@ -3,9 +3,13 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-VERSION="${VERSION:-$(tr -d '[:space:]' < VERSION.txt)}"
-VERSION="${VERSION%%-*}"
-BUILD="${BUILD_NUMBER:-${GITHUB_RUN_NUMBER:-1}}"
+VERSION_RAW="${VERSION:-$(tr -d '[:space:]' < VERSION.txt)}"
+VERSION="${VERSION_RAW%%-*}"
+VERSION_BUILD="${VERSION_RAW#*-}"
+if [[ "$VERSION_BUILD" == "$VERSION_RAW" ]]; then
+  VERSION_BUILD="${GITHUB_RUN_NUMBER:-1}"
+fi
+BUILD="${BUILD_NUMBER:-$VERSION_BUILD}"
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-dist/artifacts}"
 APP_ZIP="${APP_ZIP:-${ARTIFACTS_DIR}/DotWeaver-${VERSION}-macOS-universal.zip}"
 DOWNLOAD_BASE_URL="${DOWNLOAD_BASE_URL:-https://github.com/rausth/DotWeaver/releases/download/v${VERSION}}"
