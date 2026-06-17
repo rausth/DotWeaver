@@ -3,12 +3,28 @@ import DotWeaverKit
 
 struct SnapshotsView: View {
     @EnvironmentObject private var viewModel: DotfilesViewModel
-    @State private var snapshots: [Snapshot] = []
+    @State private var snapshotItems: [SnapshotCatalogItem] = []
+    @State private var selectedMachineID = ""
     @State private var isCreatingSnapshot = false
     @State private var snapshotName = ""
     @State private var statusMessage = ""
     
     let manager = SnapshotManager()
+
+    private var filteredItems: [SnapshotCatalogItem] {
+        guard !selectedMachineID.isEmpty else { return snapshotItems }
+        return snapshotItems.filter { $0.sourceMachineID == selectedMachineID }
+    }
+
+    private var machineOptions: [SnapshotMachineOption] {
+        var seen = Set<String>()
+        return snapshotItems.compactMap { item -> SnapshotMachineOption? in
+            let id = item.sourceMachineID
+            guard !id.isEmpty, !seen.contains(id) else { return nil }
+            seen.insert(id)
+            return SnapshotMachineOption(id: id, label: item.sourceMachineLabel)
+        }.sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -17,11 +33,24 @@ struct SnapshotsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Snapshots")
                         .font(.system(size: 28, weight: .bold, design: .rounded))
-                    Text("Roll back your environment to a previous state.")
+                    Text("Restore from this machine or another synced machine.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
+                Picker("Source", selection: $selectedMachineID) {
+                    Text("All machines").tag("")
+                    ForEach(machineOptions) { machine in
+                        Text(machine.label).tag(machine.id)
+                    }
+                }
+                .frame(width: 220)
+                .accessibilityIdentifier("snapshots.machinePicker")
+                Button(action: loadSnapshots) {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("snapshots.refresh")
                 Button(action: { isCreatingSnapshot = true }) {
                     Label("Take Snapshot", systemImage: "camera.shutter.button.fill")
                 }
@@ -42,11 +71,11 @@ struct SnapshotsView: View {
                     .font(.caption)
                     .padding(8)
                     .frame(maxWidth: .infinity)
-                    .background(statusMessage.contains("failed") ? Color.red.opacity(0.1) : Color.green.opacity(0.1))
-                    .foregroundStyle(statusMessage.contains("failed") ? .red : .green)
+                    .background(statusMessage.contains("Failed") || statusMessage.contains("failed") ? Color.red.opacity(0.1) : Color.green.opacity(0.1))
+                    .foregroundStyle(statusMessage.contains("Failed") || statusMessage.contains("failed") ? .red : .green)
             }
             
-            if snapshots.isEmpty {
+            if filteredItems.isEmpty {
                 VStack(spacing: 20) {
                     Image(systemName: "clock.arrow.circlepath")
                         .font(.system(size: 60))
@@ -55,7 +84,7 @@ struct SnapshotsView: View {
                     Text("No snapshots found")
                         .font(.headline)
                         .foregroundStyle(.secondary)
-                    Text("Create your first snapshot to secure your environment's state.")
+                    Text("Create a snapshot or configure a provider that contains snapshots from another machine.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -65,12 +94,12 @@ struct SnapshotsView: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 16) {
-                        ForEach(snapshots) { snapshot in
-                            SnapshotRow(snapshot: snapshot, restoreAction: {
-                                restore(snapshot)
-                            }, deleteAction: {
-                                delete(snapshot)
-                            })
+                        ForEach(filteredItems) { item in
+                            SnapshotRow(item: item, restoreAction: { filePath in
+                                restore(item, matching: filePath)
+                            }, deleteAction: item.location == .local ? {
+                                delete(item.snapshot)
+                            } : nil)
                         }
                     }
                     .padding(32)
@@ -111,7 +140,10 @@ struct SnapshotsView: View {
     }
     
     private func loadSnapshots() {
-        snapshots = manager.listSnapshots()
+        snapshotItems = manager.listSnapshotCatalog(providerRootPath: currentProviderRootPath(), includeLocal: true)
+        if !selectedMachineID.isEmpty && !snapshotItems.contains(where: { $0.sourceMachineID == selectedMachineID }) {
+            selectedMachineID = ""
+        }
     }
     
     private func create() {
@@ -128,16 +160,23 @@ struct SnapshotsView: View {
         }
     }
     
-    private func restore(_ snapshot: Snapshot) {
+    private func restore(_ item: SnapshotCatalogItem, matching filePath: String?) {
         Task {
             do {
                 if SecurityPolicy.requiresBiometricAuthentication {
                     _ = try await BiometricAuthenticator.shared.authenticate(reason: "Authenticate to restore snapshot")
                 }
-                try manager.restoreSnapshot(snapshot)
+                let requestedPath = filePath?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let fileToRestore = requestedPath?.isEmpty == false ? requestedPath : nil
+                try manager.restoreSnapshot(item, matching: fileToRestore)
                 await MainActor.run {
-                    statusMessage = "Restored snapshot successfully"
-                    viewModel.addActivityLog(message: "Restored snapshot: \(snapshot.name)", type: .sync)
+                    if let fileToRestore {
+                        statusMessage = "Restored \(fileToRestore) from \(item.sourceMachineLabel)"
+                        viewModel.addActivityLog(message: "Restored file from snapshot: \(fileToRestore) from \(item.sourceMachineLabel)", type: .sync)
+                    } else {
+                        statusMessage = "Restored snapshot from \(item.sourceMachineLabel)"
+                        viewModel.addActivityLog(message: "Restored snapshot: \(item.snapshot.name) from \(item.sourceMachineLabel)", type: .sync)
+                    }
                 }
             } catch {
                 await MainActor.run {
@@ -162,50 +201,93 @@ struct SnapshotsView: View {
     }
 }
 
+struct SnapshotMachineOption: Identifiable {
+    let id: String
+    let label: String
+}
+
 struct SnapshotRow: View {
-    let snapshot: Snapshot
-    let restoreAction: () -> Void
-    let deleteAction: () -> Void
+    let item: SnapshotCatalogItem
+    let restoreAction: (String?) -> Void
+    let deleteAction: (() -> Void)?
     @State private var isHovering = false
     @State private var showingConfirm = false
+    @State private var showingCustomFileRestore = false
+    @State private var showingFiles = false
+    @State private var filePathToRestore = ""
+
+    private var snapshot: Snapshot { item.snapshot }
+    private var sortedEntries: [SnapshotEntry] {
+        snapshot.entries.sorted { lhs, rhs in
+            lhs.originalPath.localizedCaseInsensitiveCompare(rhs.originalPath) == .orderedAscending
+        }
+    }
     
     var body: some View {
-        HStack(spacing: 20) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(snapshot.name)
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(snapshot.name)
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                    
+                    HStack(spacing: 12) {
+                        Label("\(snapshot.fileCount) files", systemImage: "doc.on.doc")
+                        Label(item.sourceMachineLabel, systemImage: "desktopcomputer")
+                        Text(snapshot.date, style: .date)
+                        Text(snapshot.date, style: .time)
+                        Text(item.location.rawValue.capitalized)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(item.location == .local ? Color.green.opacity(0.15) : Color.purple.opacity(0.15))
+                            .clipShape(Capsule())
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                
+                Spacer()
                 
                 HStack(spacing: 12) {
-                    Label("\(snapshot.fileCount) files", systemImage: "doc.on.doc")
-                    Text(snapshot.date, style: .date)
-                    Text(snapshot.date, style: .time)
+                    Button(action: { withAnimation(.easeInOut(duration: 0.2)) { showingFiles.toggle() } }) {
+                        Label(showingFiles ? "Hide Files" : "Show Files", systemImage: "list.bullet.rectangle")
+                            .fontWeight(.medium)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.indigo.opacity(0.2))
+                    .foregroundStyle(.indigo)
+                    .cornerRadius(8)
+                    .accessibilityIdentifier("snapshots.showFiles")
+
+                    Button(action: { showingConfirm = true }) {
+                        Label("Restore Snapshot", systemImage: "arrow.counterclockwise")
+                            .fontWeight(.medium)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.blue.opacity(0.2))
+                    .foregroundStyle(.blue)
+                    .cornerRadius(8)
+                    .accessibilityIdentifier("snapshots.restoreSnapshot")
+                    
+                    if let deleteAction {
+                        Button(action: deleteAction) {
+                            Image(systemName: "trash")
+                                .foregroundStyle(.red.opacity(0.7))
+                                .padding(8)
+                                .background(Color.red.opacity(0.1))
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
             }
-            
-            Spacer()
-            
-            HStack(spacing: 12) {
-                Button(action: { showingConfirm = true }) {
-                    Label("Restore", systemImage: "arrow.counterclockwise")
-                        .fontWeight(.medium)
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color.blue.opacity(0.2))
-                .foregroundStyle(.blue)
-                .cornerRadius(8)
-                
-                Button(action: deleteAction) {
-                    Image(systemName: "trash")
-                        .foregroundStyle(.red.opacity(0.7))
-                        .padding(8)
-                        .background(Color.red.opacity(0.1))
-                        .cornerRadius(8)
-                }
-                .buttonStyle(.plain)
+
+            if showingFiles {
+                Divider().opacity(0.25)
+                snapshotFiles
             }
         }
         .padding(20)
@@ -221,12 +303,96 @@ struct SnapshotRow: View {
             }
         }
         .confirmationDialog("Restore Snapshot?", isPresented: $showingConfirm) {
-            Button("Restore and Overwrite Local Files", role: .destructive) {
-                restoreAction()
+            Button("Restore Entire Snapshot and Overwrite Local Files", role: .destructive) {
+                restoreAction(nil)
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("This will replace your current local files with the ones from this snapshot. This action cannot be undone.")
+            Text("This will replace your current local files with files from \(item.sourceMachineLabel). This action cannot be undone.")
         }
+        .sheet(isPresented: $showingCustomFileRestore) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Restore File by Path")
+                    .font(.headline)
+                Text("Source: \(item.sourceMachineLabel)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField("Path in snapshot, e.g. ~/.zshrc", text: $filePathToRestore)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 360)
+                    .accessibilityIdentifier("snapshots.restoreFilePath")
+                HStack {
+                    Button("Cancel") {
+                        showingCustomFileRestore = false
+                    }
+                    .buttonStyle(.bordered)
+                    Spacer()
+                    Button("Restore File", role: .destructive) {
+                        restoreAction(filePathToRestore)
+                        showingCustomFileRestore = false
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(filePathToRestore.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .accessibilityIdentifier("snapshots.restoreFile")
+                }
+            }
+            .padding(28)
+            .frame(width: 420)
+        }
+    }
+
+    @ViewBuilder
+    private var snapshotFiles: some View {
+        if sortedEntries.isEmpty {
+            HStack {
+                Text("This snapshot has no file index. Restore by path if you know the file path.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Restore by Path") {
+                    showingCustomFileRestore = true
+                }
+                .buttonStyle(.bordered)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(sortedEntries, id: \.relativeStoragePath) { entry in
+                    SnapshotFileRow(entry: entry) {
+                        restoreAction(entry.originalPath)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct SnapshotFileRow: View {
+    let entry: SnapshotEntry
+    let restoreAction: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: entry.isSecret ? "lock.doc" : "doc")
+                .foregroundStyle(entry.isSecret ? .orange : .secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.originalPath)
+                    .font(.system(.caption, design: .monospaced))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(entry.relativeStoragePath)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer()
+            Button("Restore File", role: .destructive) {
+                restoreAction()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .accessibilityIdentifier("snapshots.restoreIndexedFile")
+        }
+        .padding(.vertical, 4)
     }
 }

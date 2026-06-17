@@ -390,6 +390,182 @@ final class DotWeaverKitTests: XCTestCase {
         )
     }
 
+    func testDotignoreMatcherSupportsGlobAndNegation() {
+        let matcher = DotignoreMatcher(contents: """
+        # comment
+        *.local
+        secrets/
+        !keep.local
+        """)
+
+        XCTAssertTrue(matcher.ignores(path: "~/config.local"))
+        XCTAssertTrue(matcher.ignores(path: "~/secrets/token"))
+        XCTAssertFalse(matcher.ignores(path: "~/keep.local"))
+        XCTAssertFalse(matcher.ignores(path: "~/config.toml"))
+    }
+
+    func testTemplateContextRendersMachineVariables() async throws {
+        let state = AppState(selectedProvider: .onedrive, cloudSyncPath: "/tmp/dotweaver")
+        let engine = TemplateEngine(context: .current(state: state))
+        let rendered = try await engine.render(template: "provider={{PROVIDER}} root={{sync_root}} arch={{ARCHITECTURE}}")
+        XCTAssertTrue(rendered.contains("provider=onedrive"))
+        XCTAssertTrue(rendered.contains("root=/tmp/dotweaver"))
+        XCTAssertFalse(rendered.contains("{{ARCHITECTURE}}"))
+    }
+
+    func testSnapshotCanRestoreSingleFile() throws {
+        let tempRoot = try makeTemporaryDirectory()
+        let first = tempRoot.appendingPathComponent(".first")
+        let second = tempRoot.appendingPathComponent(".second")
+        try "one\n".write(to: first, atomically: true, encoding: .utf8)
+        try "two\n".write(to: second, atomically: true, encoding: .utf8)
+
+        let manager = SnapshotManager()
+        let snapshot = try manager.createSnapshot(dotfiles: [Dotfile(path: first.path), Dotfile(path: second.path)], name: "partial-\(UUID().uuidString)")
+        try "changed-one\n".write(to: first, atomically: true, encoding: .utf8)
+        try "changed-two\n".write(to: second, atomically: true, encoding: .utf8)
+
+        try manager.restoreSnapshot(snapshot, matching: first.path)
+
+        XCTAssertEqual(try String(contentsOf: first, encoding: .utf8), "one\n")
+        XCTAssertEqual(try String(contentsOf: second, encoding: .utf8), "changed-two\n")
+    }
+
+    func testProviderSnapshotDiscoveryIncludesMachineMetadata() throws {
+        let tempRoot = try makeTemporaryDirectory()
+        let providerRoot = tempRoot.appendingPathComponent("Provider")
+        let target = tempRoot.appendingPathComponent(".zshrc")
+        let machine = MachineIdentity(
+            id: "intel1-id",
+            hostname: "intel1",
+            userName: "rausth",
+            osVersion: "macOS 14",
+            architecture: "x86_64",
+            createdAt: Date()
+        )
+        let snapshot = Snapshot(
+            name: "intel-baseline",
+            fileCount: 1,
+            machineID: machine.id,
+            entries: [SnapshotEntry(originalPath: target.path, relativeStoragePath: ".zshrc", isSecret: false)]
+        )
+        try writeProviderSnapshot(snapshot, machine: machine, providerRoot: providerRoot, contents: [".zshrc": "export INTEL=1\n"])
+
+        let items = SnapshotManager().listProviderSnapshots(providerRootPath: providerRoot.path)
+
+        let item = try XCTUnwrap(items.first)
+        XCTAssertEqual(items.count, 1)
+        XCTAssertEqual(item.snapshot.name, "intel-baseline")
+        XCTAssertEqual(item.sourceMachineID, "intel1-id")
+        XCTAssertEqual(item.machine?.hostname, "intel1")
+        XCTAssertEqual(item.location, .provider)
+    }
+
+    func testProviderSnapshotRestoreWorksWithoutLocalSnapshot() throws {
+        let tempRoot = try makeTemporaryDirectory()
+        let providerRoot = tempRoot.appendingPathComponent("Provider")
+        let target = tempRoot.appendingPathComponent(".gitconfig")
+        try "changed\n".write(to: target, atomically: true, encoding: .utf8)
+        let machine = MachineIdentity(
+            id: "linux-id",
+            hostname: "linux-laptop",
+            userName: "rausth",
+            osVersion: "Linux",
+            architecture: "x86_64",
+            createdAt: Date()
+        )
+        let snapshot = Snapshot(
+            name: "linux-baseline",
+            fileCount: 1,
+            machineID: machine.id,
+            entries: [SnapshotEntry(originalPath: target.path, relativeStoragePath: ".gitconfig", isSecret: false)]
+        )
+        try writeProviderSnapshot(snapshot, machine: machine, providerRoot: providerRoot, contents: [".gitconfig": "[user]\n\tname = Linux\n"])
+        let item = try XCTUnwrap(SnapshotManager().listProviderSnapshots(providerRootPath: providerRoot.path).first)
+
+        try SnapshotManager().restoreSnapshot(item)
+
+        XCTAssertEqual(try String(contentsOf: target, encoding: .utf8), "[user]\n\tname = Linux\n")
+    }
+
+    func testProviderSnapshotCanRestoreSingleFile() throws {
+        let tempRoot = try makeTemporaryDirectory()
+        let providerRoot = tempRoot.appendingPathComponent("Provider")
+        let first = tempRoot.appendingPathComponent(".first")
+        let second = tempRoot.appendingPathComponent(".second")
+        try "changed-one\n".write(to: first, atomically: true, encoding: .utf8)
+        try "changed-two\n".write(to: second, atomically: true, encoding: .utf8)
+        let machine = MachineIdentity(
+            id: "arm1-id",
+            hostname: "arm1",
+            userName: "rausth",
+            osVersion: "macOS 15",
+            architecture: "arm64",
+            createdAt: Date()
+        )
+        let snapshot = Snapshot(
+            name: "arm-baseline",
+            fileCount: 2,
+            machineID: machine.id,
+            entries: [
+                SnapshotEntry(originalPath: first.path, relativeStoragePath: ".first", isSecret: false),
+                SnapshotEntry(originalPath: second.path, relativeStoragePath: ".second", isSecret: false)
+            ]
+        )
+        try writeProviderSnapshot(snapshot, machine: machine, providerRoot: providerRoot, contents: [".first": "one\n", ".second": "two\n"])
+        let item = try XCTUnwrap(SnapshotManager().listProviderSnapshots(providerRootPath: providerRoot.path).first)
+
+        try SnapshotManager().restoreSnapshot(item, matching: first.path)
+
+        XCTAssertEqual(try String(contentsOf: first, encoding: .utf8), "one\n")
+        XCTAssertEqual(try String(contentsOf: second, encoding: .utf8), "changed-two\n")
+    }
+
+    func testProviderSnapshotDiscoveryWorksWithoutMachineManifest() throws {
+        let tempRoot = try makeTemporaryDirectory()
+        let providerRoot = tempRoot.appendingPathComponent("Provider")
+        let target = tempRoot.appendingPathComponent(".zprofile")
+        let machine = MachineIdentity(
+            id: "manifest-missing-id",
+            hostname: "missing-manifest",
+            userName: "rausth",
+            osVersion: "Linux",
+            architecture: "aarch64",
+            createdAt: Date()
+        )
+        let snapshot = Snapshot(
+            name: "fallback-machine",
+            fileCount: 1,
+            machineID: machine.id,
+            entries: [SnapshotEntry(originalPath: target.path, relativeStoragePath: ".zprofile", isSecret: false)]
+        )
+        try writeProviderSnapshot(snapshot, machine: machine, providerRoot: providerRoot, contents: [".zprofile": "export FALLBACK=1\n"], includeMachineManifest: false)
+
+        let item = try XCTUnwrap(SnapshotManager().listSnapshotCatalog(providerRootPath: providerRoot.path, includeLocal: false).first)
+
+        XCTAssertEqual(item.sourceMachineID, "manifest-missing-id")
+        XCTAssertEqual(item.sourceMachineLabel, "Unknown machine (manifest)")
+        XCTAssertNil(item.machine)
+        XCTAssertEqual(item.snapshot.entries.first?.originalPath, target.path)
+    }
+
+    func testAuditLogWritesHashChainFields() throws {
+        let tempRoot = try makeTemporaryDirectory()
+        setenv("DOTWEAVER_APP_SUPPORT_DIR", tempRoot.path, 1)
+        defer { unsetenv("DOTWEAVER_APP_SUPPORT_DIR") }
+
+        SyncAuditLog.record("first")
+        SyncAuditLog.record("second")
+
+        let logURL = tempRoot.appendingPathComponent("audit.jsonl")
+        let lines = try String(contentsOf: logURL, encoding: .utf8).split(separator: "\n")
+        XCTAssertEqual(lines.count, 2)
+        let first = try JSONDecoder.dotWeaver.decode(AuditEntry.self, from: Data(lines[0].utf8))
+        let second = try JSONDecoder.dotWeaver.decode(AuditEntry.self, from: Data(lines[1].utf8))
+        XCTAssertFalse(first.entryHash.isEmpty)
+        XCTAssertEqual(second.previousHash, first.entryHash)
+    }
+
     private func makeTemporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("DotWeaverTests")
@@ -412,6 +588,32 @@ final class DotWeaverKitTests: XCTestCase {
             }
             return nil
         })
+    }
+
+    private func writeProviderSnapshot(
+        _ snapshot: Snapshot,
+        machine: MachineIdentity,
+        providerRoot: URL,
+        contents: [String: String],
+        includeMachineManifest: Bool = true
+    ) throws {
+        let snapshotRoot = providerRoot
+            .appendingPathComponent(".dotweaver/snapshots")
+            .appendingPathComponent(machine.id)
+            .appendingPathComponent(UUID().uuidString)
+        let filesRoot = snapshotRoot.appendingPathComponent("files")
+        let machinesRoot = providerRoot.appendingPathComponent(".dotweaver/manifests/machines")
+        try FileManager.default.createDirectory(at: filesRoot, withIntermediateDirectories: true)
+        if includeMachineManifest {
+            try FileManager.default.createDirectory(at: machinesRoot, withIntermediateDirectories: true)
+            try JSONEncoder.pretty.encode(machine).write(to: machinesRoot.appendingPathComponent(machine.id + ".json"), options: .atomic)
+        }
+        try JSONEncoder.pretty.encode(snapshot).write(to: snapshotRoot.appendingPathComponent("metadata.json"), options: .atomic)
+        for (relativePath, content) in contents {
+            let url = filesRoot.appendingPathComponent(relativePath)
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try content.write(to: url, atomically: true, encoding: .utf8)
+        }
     }
 
     private func posixPermissions(_ url: URL) throws -> Int {

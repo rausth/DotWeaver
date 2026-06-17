@@ -6,15 +6,15 @@
     <description>DotWeaver macOS updates</description>
     <language>en</language>
     <item>
-      <title>Version 1.0.0</title>
-      <link>https://github.com/rausth/DotWeaver/releases/tag/v1.0.0</link>
-      <sparkle:version>1</sparkle:version>
-      <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+      <title>Version 1.0.1</title>
+      <link>https://github.com/rausth/DotWeaver/releases/tag/v1.0.1</link>
+      <sparkle:version>86</sparkle:version>
+      <sparkle:shortVersionString>1.0.1</sparkle:shortVersionString>
       <description><![CDATA[
         <p>See GitHub release notes for changes.</p>
       ]]></description>
-      <pubDate>Sun, 07 Jun 2026 18:20:48 +0000</pubDate>
-      <enclosure url="https://github.com/rausth/DotWeaver/releases/download/v1.0.0/DotWeaver-1.0.0-macOS-universal.zip" sparkle:version="1" sparkle:shortVersionString="1.0.0" length="4367855" type="application/octet-stream" />
+      <pubDate>Tue, 16 Jun 2026 22:28:44 +0000</pubDate>
+      <enclosure url="https://github.com/rausth/DotWeaver/releases/download/v1.0.1/DotWeaver-1.0.1-macOS-universal.zip" sparkle:version="86" sparkle:shortVersionString="1.0.1" length="4874060" type="application/octet-stream" />
     </item>
   </channel>
 </rss>

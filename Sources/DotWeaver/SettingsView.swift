@@ -36,6 +36,7 @@ struct SettingsView: View {
                 Section {
                     Toggle("Enable automatic sync", isOn: $autoSyncEnabled)
                         .toggleStyle(.switch)
+                        .accessibilityLabel("Enable automatic sync")
                     
                     if autoSyncEnabled {
                         VStack(alignment: .leading, spacing: 8) {
@@ -43,6 +44,8 @@ struct SettingsView: View {
                                 .foregroundStyle(.secondary)
                             Slider(value: $syncInterval, in: 60...3600, step: 60)
                                 .tint(.blue)
+                                .accessibilityLabel("Sync interval")
+                                .accessibilityValue("\(Int(syncInterval / 60)) minutes")
                         }
                         .padding(.leading, 24)
                         .padding(.top, 4)
@@ -102,12 +105,14 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Button {
+                    Button {
                             Task { await viewModel.refreshAvailableMachines() }
                         } label: {
                             Label("Refresh", systemImage: "arrow.clockwise")
                         }
                         .buttonStyle(.bordered)
+                        .disabled(viewModel.isSyncing)
+                        .accessibilityLabel("Refresh available machines")
                     }
                 } header: {
                     Text("Machine Source")
@@ -269,7 +274,15 @@ struct SettingsView: View {
                     Toggle("Require biometric authentication", isOn: $biometricEnabled)
                         .toggleStyle(.switch)
                         .help("Require Touch ID or Face ID to access credentials")
+                        .accessibilityLabel("Require biometric authentication")
                     
+                    SecurityStatusRow(
+                        title: "Vault authentication",
+                        isEnabled: biometricEnabled,
+                        enabledText: "Biometric gate active",
+                        disabledText: "Vaulted sync does not require biometrics"
+                    )
+
                     Text("When enabled, you'll need to authenticate with Touch ID or Face ID to sync or access stored credentials.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -282,6 +295,17 @@ struct SettingsView: View {
                 Section {
                     Toggle("Allow pre/post sync hook scripts", isOn: $hooksEnabled)
                         .toggleStyle(.switch)
+                        .onChange(of: hooksEnabled) { _, newValue in
+                            SecurityPolicy.setHooksEnabled(newValue)
+                        }
+                        .accessibilityLabel("Allow pre and post sync hook scripts")
+
+                    SecurityStatusRow(
+                        title: "Hook scripts",
+                        isEnabled: hooksEnabled,
+                        enabledText: "Trusted scripts can run during sync",
+                        disabledText: "Hook execution blocked"
+                    )
 
                     Text("Hooks execute zsh script files from ~/.dotweaver/hooks. Keep disabled unless every hook is trusted.")
                         .font(.caption)
@@ -455,5 +479,31 @@ struct SettingsView: View {
         case .sftp, .ftps: return "server.rack"
         case .s3: return "tray.2"
         }
+    }
+}
+
+private struct SecurityStatusRow: View {
+    let title: String
+    let isEnabled: Bool
+    let enabledText: String
+    let disabledText: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: isEnabled ? "checkmark.shield.fill" : "xmark.shield.fill")
+                .foregroundStyle(isEnabled ? .green : .secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text(isEnabled ? enabledText : disabledText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(10)
+        .background((isEnabled ? Color.green : Color.gray).opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 }

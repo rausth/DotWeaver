@@ -55,12 +55,21 @@ dw git status
 ## Snapshots And Conflicts
 
 ```bash
-dw snapshot list
+dw snapshot machines
+dw snapshot list [--machine <id-or-hostname>]
 dw snapshot create <name>
-dw snapshot restore <id-or-name>
+dw snapshot restore <id-or-name> [--machine <id-or-hostname>] [--file <path>]
 dw snapshot delete <id-or-name>
 dw conflicts list
 dw conflicts resolve <file> <local|stored|newest>
+```
+
+`--machine` selects source machine for provider-hosted snapshots. ID match wins; hostname must be unique.
+
+```bash
+dw snapshot machines
+dw snapshot list --machine intel1
+dw snapshot restore before-shell-change --machine intel1 --file ~/.zshrc
 ```
 
 ## Versions

@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import DotWeaverKit
 
@@ -15,7 +16,8 @@ struct CLICommands {
             switch command {
             case "add": try add(args)
             case "remove", "rm": try remove(args)
-            case "status": status()
+            case "status": try status(args)
+            case "plan": try plan(args)
             case "list", "ls": list(args)
             case "vault": try vault(args)
             case "sync": await sync()
@@ -32,7 +34,7 @@ struct CLICommands {
             case "conflicts": try conflicts(args)
             case "machine": try machine()
             case "versions": try versions(args)
-            case "template", "templates": try template(args)
+            case "template", "templates": try await template(args)
             case "interop": try interop(args)
             case "--help", "-h", "help": printUsage()
             default:
@@ -54,7 +56,8 @@ struct CLICommands {
           dw add <file> [--group <name>] [--tag <tag>] [--strategy <lastModifiedWins|localWins|remoteWins|manual>]
           dw remove <file>
           dw list [--all]
-          dw status
+          dw status [--diff]
+          dw plan
           dw vault <file>
           dw monitor <file> <on|off>
           dw metadata <file> [--group <name>] [--tag <tag>] [--pre-hook <script>] [--post-hook <script>] [--strategy <strategy>]
@@ -74,9 +77,10 @@ struct CLICommands {
           dw git status
 
         Snapshots/conflicts:
-          dw snapshot list
+          dw snapshot machines
+          dw snapshot list [--machine <id-or-hostname>]
           dw snapshot create <name>
-          dw snapshot restore <id-or-name>
+          dw snapshot restore <id-or-name> [--machine <id-or-hostname>] [--file <path>]
           dw snapshot delete <id-or-name>
           dw conflicts list
           dw conflicts resolve <file> <local|stored|newest>
@@ -84,6 +88,7 @@ struct CLICommands {
         System:
           dw doctor
           dw hooks <on|off>
+          dw hooks approve <script>
           dw machine
           dw versions <file>
           dw versions restore <file> <version-id>
@@ -128,7 +133,7 @@ struct CLICommands {
         print("Removed: \(path)")
     }
 
-    static func status() {
+    static func status(_ args: [String]) throws {
         let state = StateManager.loadState()
         print("Provider: \(state.selectedProvider.title)")
         print("Transport: \(transportMode(for: state.selectedProvider, state: state).title)")
@@ -142,6 +147,41 @@ struct CLICommands {
             print("Last sync: \(lastSync)")
         } else {
             print("Last sync: never")
+        }
+        if args.contains("--diff") {
+            try printDiffStatus(state)
+        }
+    }
+
+    static func plan(_ args: [String]) throws {
+        let state = StateManager.loadState()
+        let root = currentProviderRootPath(state) ?? ""
+        let matcher = DotignoreMatcher.load(providerRootPath: root)
+        let monitored = state.dotfiles.filter(\.isMonitored)
+        let ignored = monitored.filter { matcher.ignores(path: $0.path) }
+        let syncable = monitored.filter { !matcher.ignores(path: $0.path) }
+        let missing = syncable.filter { !FileManager.default.fileExists(atPath: expand($0.path)) }
+        let conflicts = state.dotfiles.filter { $0.status == .conflict }
+
+        print("Plan")
+        print("Provider: \(state.selectedProvider.title) [\(transportMode(for: state.selectedProvider, state: state).title)]")
+        print("Root: \(root.isEmpty ? "-" : root)")
+        print("Monitored: \(monitored.count)")
+        print("Syncable: \(syncable.count)")
+        print("Ignored: \(ignored.count)")
+        print("Missing: \(missing.count)")
+        print("Conflicts: \(conflicts.count)")
+        print("Vaulted: \(syncable.filter(\.isSecret).count)")
+        if !ignored.isEmpty {
+            print("Ignored files:")
+            ignored.forEach { print("  \($0.path)") }
+        }
+        if !missing.isEmpty {
+            print("Missing files:")
+            missing.forEach { print("  \($0.path)") }
+        }
+        if args.contains("--diff") {
+            try printDiffStatus(state)
         }
     }
 
@@ -274,25 +314,45 @@ struct CLICommands {
     static func snapshot(_ args: [String]) async throws {
         guard let sub = args.first else { throw CLIError.message("snapshot requires subcommand") }
         let manager = SnapshotManager()
+        let state = StateManager.loadState()
+        let providerRoot = currentProviderRootPath(state)
         switch sub {
+        case "machines":
+            let items = manager.listSnapshotCatalog(providerRootPath: providerRoot, includeLocal: true)
+            let machines = snapshotMachines(from: items)
+            if machines.isEmpty {
+                print("No snapshot machines")
+                return
+            }
+            for machine in machines {
+                print("\(machine.id) host=\(machine.hostname) user=\(machine.userName) arch=\(machine.architecture) os=\(machine.osVersion)")
+            }
         case "list":
-            for snapshot in manager.listSnapshots() {
-                print("\(snapshot.id.uuidString) \(snapshot.name) files=\(snapshot.fileCount) machine=\(snapshot.machineID) date=\(snapshot.date)")
+            let machine = try resolveMachineFilter(optionValue("--machine", in: args), manager: manager, providerRootPath: providerRoot)
+            let snapshots = filteredSnapshots(manager.listSnapshotCatalog(providerRootPath: providerRoot, includeLocal: true), machineID: machine?.id)
+            if snapshots.isEmpty {
+                print("No snapshots")
+                return
+            }
+            for item in snapshots {
+                print("\(item.snapshot.id.uuidString) \(item.snapshot.name) files=\(item.snapshot.fileCount) machine=\(item.sourceMachineLabel) location=\(item.location.rawValue) date=\(item.snapshot.date)")
             }
         case "create":
             let name = try requiredArg(args, 1, "snapshot name")
-            let state = StateManager.loadState()
-            let snapshot = try manager.createSnapshot(dotfiles: state.dotfiles, name: name, providerRootPath: currentProviderRootPath(state))
+            let snapshot = try manager.createSnapshot(dotfiles: state.dotfiles, name: name, providerRootPath: providerRoot)
             print("Snapshot: \(snapshot.id.uuidString) \(snapshot.name)")
         case "restore":
-            let snapshot = try findSnapshot(requiredArg(args, 1, "snapshot id-or-name"), manager: manager)
+            let machine = try resolveMachineFilter(optionValue("--machine", in: args), manager: manager, providerRootPath: providerRoot)
+            let item = try findSnapshot(requiredArg(args, 1, "snapshot id-or-name"), manager: manager, providerRootPath: providerRoot, machineID: machine?.id)
+            let file = optionValue("--file", in: args)
             if SecurityPolicy.requiresBiometricAuthentication {
                 _ = try await BiometricAuthenticator.shared.authenticate(reason: "Authenticate to restore snapshot")
             }
-            try manager.restoreSnapshot(snapshot)
-            print("Restored: \(snapshot.name)")
+            try manager.restoreSnapshot(item, matching: file)
+            let scope = machine.map { " from \($0.hostname)" } ?? ""
+            print(file == nil ? "Restored: \(item.snapshot.name)\(scope)" : "Restored: \(file!) from \(item.snapshot.name)\(scope)")
         case "delete":
-            let snapshot = try findSnapshot(requiredArg(args, 1, "snapshot id-or-name"), manager: manager)
+            let snapshot = try findLocalSnapshot(requiredArg(args, 1, "snapshot id-or-name"), manager: manager)
             try manager.deleteSnapshot(snapshot)
             print("Deleted: \(snapshot.name)")
         default:
@@ -324,7 +384,7 @@ struct CLICommands {
     }
 
     static func hooks(_ args: [String]) throws {
-        let value = try requiredArg(args, 0, "on|off")
+        let value = try requiredArg(args, 0, "on|off|approve")
         switch value {
         case "on", "enable", "enabled":
             SecurityPolicy.setHooksEnabled(true)
@@ -332,8 +392,13 @@ struct CLICommands {
         case "off", "disable", "disabled":
             SecurityPolicy.setHooksEnabled(false)
             print("Hooks disabled")
+        case "approve":
+            let script = try requiredArg(args, 1, "script")
+            let approval = try HookApprovalStore.approve(scriptPath: script)
+            print("Approved hook: \(approval.path)")
+            print("SHA256: \(approval.sha256)")
         default:
-            throw CLIError.message("Use on or off")
+            throw CLIError.message("Use on, off, or approve")
         }
     }
 
@@ -417,7 +482,7 @@ struct CLICommands {
         }
     }
 
-    static func template(_ args: [String]) throws {
+    static func template(_ args: [String]) async throws {
         guard let sub = args.first else { throw CLIError.message("template requires subcommand") }
         switch sub {
         case "list":
@@ -430,7 +495,8 @@ struct CLICommands {
                 throw CLIError.message("Unknown template: \(key)")
             }
             let url = URL(fileURLWithPath: expand(template.path))
-            guard let data = template.content.data(using: .utf8) else {
+            let rendered = try await TemplateEngine(context: .current()).render(template: template.content)
+            guard let data = rendered.data(using: .utf8) else {
                 throw CLIError.message("Unable to encode template content")
             }
             try SyncPathSecurity.writeFileAtomically(data, to: url)
@@ -539,6 +605,44 @@ private func currentProviderRootPath(_ state: AppState) -> String? {
     state.selectedProvider == .git ? state.gitLocalPath : state.cloudSyncPath
 }
 
+private func printDiffStatus(_ state: AppState) throws {
+    guard let root = currentProviderRootPath(state), !root.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        print("Diff: provider root not configured")
+        return
+    }
+    let storageRoot = URL(fileURLWithPath: expand(root))
+    let matcher = DotignoreMatcher.load(providerRootPath: root)
+    print("Diff:")
+    for file in state.dotfiles where file.isMonitored && !matcher.ignores(path: file.path) {
+        let localURL = URL(fileURLWithPath: expand(file.path))
+        let storedURL = SyncStoragePaths.remoteFileURL(forLocalFile: localURL, storageRoot: storageRoot)
+        let localExists = FileManager.default.fileExists(atPath: localURL.path)
+        let storedExists = FileManager.default.fileExists(atPath: storedURL.path)
+        switch (localExists, storedExists) {
+        case (false, false):
+            print("  missing both: \(file.path)")
+        case (false, true):
+            print("  restore candidate: \(file.path)")
+        case (true, false):
+            print("  new local: \(file.path)")
+        case (true, true):
+            let localHash = try contentHash(at: localURL, decrypt: false)
+            let storedHash = try contentHash(at: storedURL, decrypt: true)
+            if localHash == storedHash {
+                print("  clean: \(file.path)")
+            } else {
+                print("  changed: \(file.path)")
+            }
+        }
+    }
+}
+
+private func contentHash(at url: URL, decrypt: Bool) throws -> String {
+    let raw = try Data(contentsOf: url)
+    let data = decrypt ? try VaultCrypto.decryptIfNeeded(raw) : raw
+    return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+}
+
 private func runConfiguredGit(_ arguments: [String]) throws -> String {
     let repositoryPath = StateManager.loadState().gitLocalPath.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !repositoryPath.isEmpty else {
@@ -604,12 +708,44 @@ private func applyDotfileOptions(_ dotfile: inout Dotfile, args: [String]) {
     }
 }
 
-private func findSnapshot(_ idOrName: String, manager: SnapshotManager) throws -> Snapshot {
+private func findLocalSnapshot(_ idOrName: String, manager: SnapshotManager) throws -> Snapshot {
     let snapshots = manager.listSnapshots()
     if let snapshot = snapshots.first(where: { $0.id.uuidString == idOrName || $0.name == idOrName }) {
         return snapshot
     }
     throw CLIError.message("Snapshot not found: \(idOrName)")
+}
+
+private func findSnapshot(_ idOrName: String, manager: SnapshotManager, providerRootPath: String?, machineID: String?) throws -> SnapshotCatalogItem {
+    let matches = filteredSnapshots(manager.listSnapshotCatalog(providerRootPath: providerRootPath, includeLocal: true), machineID: machineID)
+        .filter { $0.snapshot.id.uuidString == idOrName || $0.snapshot.name == idOrName }
+    guard !matches.isEmpty else { throw CLIError.message("Snapshot not found: \(idOrName)") }
+    guard matches.count == 1 else { throw CLIError.message("Multiple snapshots match: \(idOrName). Use --machine <id-or-hostname>.") }
+    return matches[0]
+}
+
+private func filteredSnapshots(_ items: [SnapshotCatalogItem], machineID: String?) -> [SnapshotCatalogItem] {
+    guard let machineID, !machineID.isEmpty else { return items }
+    return items.filter { $0.sourceMachineID == machineID }
+}
+
+private func snapshotMachines(from items: [SnapshotCatalogItem]) -> [MachineIdentity] {
+    var seen = Set<String>()
+    return items.compactMap(\.machine).filter { machine in
+        if seen.contains(machine.id) { return false }
+        seen.insert(machine.id)
+        return true
+    }.sorted { $0.hostname.localizedCaseInsensitiveCompare($1.hostname) == .orderedAscending }
+}
+
+private func resolveMachineFilter(_ raw: String?, manager: SnapshotManager, providerRootPath: String?) throws -> MachineIdentity? {
+    guard let raw, !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+    let machines = snapshotMachines(from: manager.listSnapshotCatalog(providerRootPath: providerRootPath, includeLocal: true))
+    if let exact = machines.first(where: { $0.id == raw }) { return exact }
+    let matches = machines.filter { $0.hostname.localizedCaseInsensitiveCompare(raw) == .orderedSame }
+    guard !matches.isEmpty else { throw CLIError.message("Machine not found: \(raw)") }
+    guard matches.count == 1 else { throw CLIError.message("Multiple machines match hostname: \(raw). Use machine ID.") }
+    return matches[0]
 }
 
 private func resolveConflict(path: String, strategy: String) throws {

@@ -2,6 +2,7 @@ import Foundation
 
 final class GitProvider: SyncProviderProtocol {
     let name = SyncProvider.git
+    let capabilities: SyncProviderCapabilities = [.managedFileSync, .remoteRepositorySync, .machineDiscovery]
 
     private let storageRootProvider: () -> String
     private let remoteURLProvider: () -> String

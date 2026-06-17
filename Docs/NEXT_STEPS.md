@@ -1,7 +1,7 @@
 # DotWeaver - Next Steps
 
-**Date:** June 5, 2026
-**Status:** v1.0.0 is released on GitHub. Core app, CLI, sync, security hardening, Sparkle packaging, hosted appcast validation, and website are implemented.
+**Date:** June 16, 2026
+**Status:** v1.0.1 is ready for GitHub/ad-hoc distribution. Core app, CLI, sync, security hardening, Sparkle packaging, local release validation, and website are implemented. Apple notarization remains blocked by paid Apple Developer credentials.
 
 ## Complete
 
@@ -15,13 +15,20 @@
 - Real conflict comparison and resolution against stored provider copies
 - CLI parity commands for files, sync, providers, native config, Git config, snapshots, conflicts, doctor, hooks, templates
 - Snapshot create/list/restore/delete
-- Snapshot path preservation and provider snapshot sync
+- Snapshot path preservation, provider snapshot sync, source-machine restore, indexed per-file restore, and full snapshot restore actions
 - Machine identity, manifests, and version history
 - AES.GCM vault encryption for provider-stored secret files
 - Biometric/device-owner gates for vaulted sync, snapshot restore, and credential reads
-- Hook execution disabled by default with audit entries
+- Hook execution disabled by default, SHA-256 approved, restricted to managed paths, and audited
 - Symlink and storage-root path checks
-- Template engine
+- Template engine with machine/context variables and `{{ vault "provider.account" }}` placeholders
+- `.dotignore` filtering for sync planning and execution
+- `dw plan` dry-run sync inspection
+- `dw status --diff` local-vs-stored content comparison
+- Partial snapshot restore with `dw snapshot restore <id-or-name> --file <path>`
+- Provider-hosted snapshot restore from selected machines with `dw snapshot restore <id-or-name> --machine <id-or-hostname>`
+- Keychain credential update-or-add behavior
+- Audit log rotation with hash-chain fields
 - File editor
 - Unit/integration tests for core sync behavior
 - Sparkle appcast generation and universal app/CLI packaging
@@ -30,8 +37,8 @@
 - Isolated provider matrix smoke script for Git and all folder-backed providers
 - App launch smoke script with optional Accessibility check
 - Local release/appcast validation script
-- Hosted Sparkle appcast/release asset validation script and release workflow step
-- Hosted v1.0.0 release with signed Sparkle appcast
+- Signed Sparkle appcast generation
+- Hosted v1.0.1 release with signed Sparkle appcast after tagging and publishing release assets
 - DotWeaver app icon integrated into the app sidebar, onboarding, menu bar extra, and release package resource bundle
 - Dark professional website on GitHub Pages
 - Mackup config import and basic chezmoi source import/export in CLI
@@ -45,7 +52,7 @@ DotWeaver stores files under:
 <provider folder>/.dotweaver/files/machines/<machine-id>/
 <provider folder>/.dotweaver/manifests/
 <provider folder>/.dotweaver/versions/
-<provider folder>/.dotweaver/snapshots/
+<provider folder>/.dotweaver/snapshots/<machine-id>/
 ```
 
 Current providers use this model:
@@ -75,7 +82,8 @@ swift test
 script/smoke_provider_matrix.sh
 script/validate_release_local.sh
 script/smoke_app_ui.sh
-APPCAST_URL=https://github.com/rausth/DotWeaver/releases/download/v1.0.0/appcast.xml REQUIRE_SPARKLE_SIGNATURE=1 script/validate_hosted_sparkle.sh
+script/smoke_real_provider_folders.sh
+script/smoke_native_protocol_endpoints.sh
 ```
 
 Expected result: tests pass, release artifacts are generated, app signature verifies.

@@ -1,8 +1,10 @@
+import CryptoKit
 import Foundation
 
 public enum SyncAuditLog {
+    private static let maxBytes = 1_048_576
+
     public static func record(_ message: String, metadata: [String: String] = [:]) {
-        let entry = AuditEntry(timestamp: Date(), message: message, metadata: metadata)
         let url = auditURL()
 
         do {
@@ -11,7 +13,16 @@ public enum SyncAuditLog {
                 withIntermediateDirectories: true,
                 attributes: [.posixPermissions: 0o700]
             )
-            let data = try JSONEncoder().encode(entry)
+            try rotateIfNeeded(url)
+            let previousHash = lastEntryHash(at: url)
+            let entry = try AuditEntry(
+                timestamp: Date(),
+                message: message,
+                metadata: metadata,
+                previousHash: previousHash,
+                entryHash: ""
+            ).signed()
+            let data = try JSONEncoder.dotWeaverAudit.encode(entry)
             if FileManager.default.fileExists(atPath: url.path) {
                 let handle = try FileHandle(forWritingTo: url)
                 try handle.seekToEnd()
@@ -27,13 +38,75 @@ public enum SyncAuditLog {
         }
     }
 
+    private static func rotateIfNeeded(_ url: URL) throws {
+        guard let size = try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber,
+              size.intValue >= maxBytes else { return }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let rotated = url.deletingLastPathComponent()
+            .appendingPathComponent("audit-\(formatter.string(from: Date())).jsonl")
+        try FileManager.default.moveItem(at: url, to: rotated)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: rotated.path)
+    }
+
+    private static func lastEntryHash(at url: URL) -> String? {
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        do {
+            let handle = try FileHandle(forReadingFrom: url)
+            defer { try? handle.close() }
+            let size = try handle.seekToEnd()
+            if size == 0 { return nil }
+            let tail = min(UInt64(4096), size)
+            try handle.seek(toOffset: size - tail)
+            let data = (try handle.read(upToCount: Int(tail))) ?? Data()
+            guard let text = String(data: data, encoding: .utf8), !text.isEmpty else { return nil }
+            // Walk backwards over lines in the tail to find the last valid AuditEntry.
+            // The first segment in the tail may be a partial line from before the window; ignore it.
+            let lines = text.split(separator: "\n")
+            for line in lines.reversed() {
+                let s = String(line).trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !s.isEmpty, let lineData = s.data(using: .utf8) else { continue }
+                if let entry = try? JSONDecoder.dotWeaver.decode(AuditEntry.self, from: lineData) {
+                    return entry.entryHash
+                }
+            }
+            return nil
+        } catch {
+            return nil
+        }
+    }
+
     private static func auditURL() -> URL {
         StateManager.appSupportDirectory.appendingPathComponent("audit.jsonl")
     }
 }
 
-private struct AuditEntry: Codable {
-    let timestamp: Date
-    let message: String
-    let metadata: [String: String]
+public struct AuditEntry: Codable, Sendable {
+    public let timestamp: Date
+    public let message: String
+    public let metadata: [String: String]
+    public let previousHash: String?
+    public let entryHash: String
+
+    func signed() throws -> AuditEntry {
+        let unsigned = AuditEntry(
+            timestamp: timestamp,
+            message: message,
+            metadata: metadata,
+            previousHash: previousHash,
+            entryHash: ""
+        )
+        let data = try JSONEncoder.dotWeaverAudit.encode(unsigned)
+        let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        return AuditEntry(timestamp: timestamp, message: message, metadata: metadata, previousHash: previousHash, entryHash: hash)
+    }
+}
+
+private extension JSONEncoder {
+    static var dotWeaverAudit: JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }
 }

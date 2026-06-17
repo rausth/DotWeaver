@@ -1,29 +1,39 @@
 import Foundation
 import Security
 
-actor CredentialManager {
-    static let shared = CredentialManager()
+public actor CredentialManager {
+    public static let shared = CredentialManager()
     private init() {}
     
     private let serviceName = "com.rausth.DotWeaver"
     
-    func savePassword(for provider: SyncProvider, account: String, password: String) throws {
-        let query: [String: Any] = [
+    public func savePassword(for provider: SyncProvider, account: String, password: String) throws {
+        let accountKey = "\(provider.rawValue).\(account)"
+        let lookupQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: serviceName,
-            kSecAttrAccount as String: "\(provider.rawValue).\(account)",
-            kSecValueData as String: password.data(using: .utf8)!,
+            kSecAttrAccount as String: accountKey
+        ]
+        let attributes: [String: Any] = [
+            kSecValueData as String: password.data(using: .utf8) ?? Data(),
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         ]
-        
-        SecItemDelete(query as CFDictionary)
-        let status = SecItemAdd(query as CFDictionary, nil)
-        guard status == errSecSuccess else {
-            throw NSError(domain: "CredentialManager", code: Int(status))
+
+        let updateStatus = SecItemUpdate(lookupQuery as CFDictionary, attributes as CFDictionary)
+        if updateStatus == errSecSuccess { return }
+        guard updateStatus == errSecItemNotFound else {
+            throw NSError(domain: "CredentialManager", code: Int(updateStatus))
+        }
+
+        var addQuery = lookupQuery
+        attributes.forEach { addQuery[$0.key] = $0.value }
+        let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+        guard addStatus == errSecSuccess else {
+            throw NSError(domain: "CredentialManager", code: Int(addStatus))
         }
     }
     
-    func getPassword(for provider: SyncProvider, account: String) async throws -> String? {
+    public func getPassword(for provider: SyncProvider, account: String) async throws -> String? {
         if SecurityPolicy.requiresBiometricAuthentication {
             _ = try await BiometricAuthenticator.shared.authenticate(reason: "Authenticate to access \(provider.title) credentials")
         }
