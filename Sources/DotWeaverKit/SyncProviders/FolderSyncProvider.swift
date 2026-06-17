@@ -38,12 +38,14 @@ final class FolderSyncProvider: SyncProviderProtocol {
             try SyncPathSecurity.ensureContained(writeRemoteURL, in: storageRoot)
 
             do {
-                try sync(dotfile: dotfile, localURL: localURL, sourceRemoteURL: sourceRemoteURL, writeRemoteURL: writeRemoteURL, storageRoot: storageRoot)
+                let wroteStoredFile = try sync(dotfile: dotfile, localURL: localURL, sourceRemoteURL: sourceRemoteURL, writeRemoteURL: writeRemoteURL, storageRoot: storageRoot)
                 dotfile.status = .synced
                 dotfile.lastSynced = Date()
                 dotfile.lastLocalModified = modificationDate(at: localURL)
                 dotfile.lastRemoteModified = modificationDate(at: sourceRemoteURL) ?? modificationDate(at: writeRemoteURL)
-                try writeVersion(dotfile: dotfile, localURL: localURL, remoteURL: writeRemoteURL, storageRoot: storageRoot)
+                if wroteStoredFile {
+                    try writeVersion(dotfile: dotfile, localURL: localURL, remoteURL: writeRemoteURL, storageRoot: storageRoot)
+                }
             } catch let syncError as SyncError {
                 if case .conflictDetected = syncError {
                     dotfile.status = .conflict
@@ -134,7 +136,7 @@ final class FolderSyncProvider: SyncProviderProtocol {
         return selected.isEmpty ? currentMachineID : selected
     }
 
-    private func sync(dotfile: Dotfile, localURL: URL, sourceRemoteURL: URL, writeRemoteURL: URL, storageRoot: URL) throws {
+    private func sync(dotfile: Dotfile, localURL: URL, sourceRemoteURL: URL, writeRemoteURL: URL, storageRoot: URL) throws -> Bool {
         let fm = FileManager.default
         let localExists = fm.fileExists(atPath: localURL.path)
         let sourceRemoteExists = fm.fileExists(atPath: sourceRemoteURL.path)
@@ -145,74 +147,77 @@ final class FolderSyncProvider: SyncProviderProtocol {
 
         switch (localExists, remoteExists) {
         case (true, false):
-            try writeStoredFile(from: localURL, to: writeRemoteURL, dotfile: dotfile)
+            return try writeStoredFile(from: localURL, to: writeRemoteURL, dotfile: dotfile)
         case (false, true):
-            try restoreStoredFile(from: readableRemoteURL, to: localURL)
-            try writeStoredFile(from: localURL, to: writeRemoteURL, dotfile: dotfile)
+            _ = try restoreStoredFile(from: readableRemoteURL, to: localURL)
+            return try writeStoredFile(from: localURL, to: writeRemoteURL, dotfile: dotfile)
         case (false, false):
             throw SyncError.fileNotFound(localURL.path)
         case (true, true):
-            try resolveExistingFiles(dotfile: dotfile, localURL: localURL, sourceRemoteURL: readableRemoteURL, writeRemoteURL: writeRemoteURL)
+            return try resolveExistingFiles(dotfile: dotfile, localURL: localURL, sourceRemoteURL: readableRemoteURL, writeRemoteURL: writeRemoteURL)
         }
     }
 
-    private func resolveExistingFiles(dotfile: Dotfile, localURL: URL, sourceRemoteURL: URL, writeRemoteURL: URL) throws {
+    private func resolveExistingFiles(dotfile: Dotfile, localURL: URL, sourceRemoteURL: URL, writeRemoteURL: URL) throws -> Bool {
         switch dotfile.conflictStrategy {
         case .localWins:
-            try writeStoredFile(from: localURL, to: writeRemoteURL, dotfile: dotfile)
+            return try writeStoredFile(from: localURL, to: writeRemoteURL, dotfile: dotfile)
         case .remoteWins:
-            try restoreStoredFile(from: sourceRemoteURL, to: localURL)
-            try writeStoredFile(from: localURL, to: writeRemoteURL, dotfile: dotfile)
+            _ = try restoreStoredFile(from: sourceRemoteURL, to: localURL)
+            return try writeStoredFile(from: localURL, to: writeRemoteURL, dotfile: dotfile)
         case .manual:
             if try !filesAreEqual(localURL, sourceRemoteURL, isSecret: dotfile.isSecret) {
                 throw SyncError.conflictDetected([])
             }
             if sourceRemoteURL.path != writeRemoteURL.path {
-                try writeStoredFile(from: localURL, to: writeRemoteURL, dotfile: dotfile)
+                return try writeStoredFile(from: localURL, to: writeRemoteURL, dotfile: dotfile)
             }
+            return false
         case .lastModifiedWins:
             let localDate = modificationDate(at: localURL) ?? .distantPast
             let remoteDate = modificationDate(at: sourceRemoteURL) ?? .distantPast
 
             if abs(localDate.timeIntervalSince(remoteDate)) < 1 {
                 if sourceRemoteURL.path != writeRemoteURL.path {
-                    try writeStoredFile(from: localURL, to: writeRemoteURL, dotfile: dotfile)
+                    return try writeStoredFile(from: localURL, to: writeRemoteURL, dotfile: dotfile)
                 }
-                return
+                return false
             }
 
             if localDate > remoteDate {
-                try writeStoredFile(from: localURL, to: writeRemoteURL, dotfile: dotfile)
+                return try writeStoredFile(from: localURL, to: writeRemoteURL, dotfile: dotfile)
             } else {
-                try restoreStoredFile(from: sourceRemoteURL, to: localURL)
-                try writeStoredFile(from: localURL, to: writeRemoteURL, dotfile: dotfile)
+                _ = try restoreStoredFile(from: sourceRemoteURL, to: localURL)
+                return try writeStoredFile(from: localURL, to: writeRemoteURL, dotfile: dotfile)
             }
         }
     }
 
-    private func writeStoredFile(from source: URL, to destination: URL, dotfile: Dotfile) throws {
+    private func writeStoredFile(from source: URL, to destination: URL, dotfile: Dotfile) throws -> Bool {
         let data = try Data(contentsOf: source)
         let storedData = dotfile.isSecret ? try VaultCrypto.encrypt(data, originalPath: dotfile.path) : data
-        try writeData(storedData, to: destination)
+        return try writeDataIfChanged(storedData, to: destination)
     }
 
-    private func restoreStoredFile(from source: URL, to destination: URL) throws {
+    private func restoreStoredFile(from source: URL, to destination: URL) throws -> Bool {
         let data = try Data(contentsOf: source)
         let restoredData = try VaultCrypto.decryptIfNeeded(data)
-        try writeData(restoredData, to: destination)
+        return try writeDataIfChanged(restoredData, to: destination)
     }
 
-    private func writeData(_ data: Data, to destination: URL) throws {
+    @discardableResult
+    private func writeDataIfChanged(_ data: Data, to destination: URL) throws -> Bool {
         let fm = FileManager.default
         try SyncPathSecurity.ensureContained(destination, in: destination.deletingLastPathComponent())
         try fm.createSecureDirectory(at: destination.deletingLastPathComponent())
 
-        if fm.fileExists(atPath: destination.path) {
-            try fm.removeItem(at: destination)
+        if fm.fileExists(atPath: destination.path), try Data(contentsOf: destination) == data {
+            return false
         }
 
         try data.write(to: destination, options: .atomic)
         try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destination.path)
+        return true
     }
 
     private func storageURL(for localURL: URL, under storageRoot: URL, machineID: String) -> URL {
@@ -241,8 +246,7 @@ final class FolderSyncProvider: SyncProviderProtocol {
             .appendingPathComponent(identity.id + ".json")
         try SyncPathSecurity.ensureContained(url, in: storageRoot)
         try FileManager.default.createSecureDirectory(at: url.deletingLastPathComponent())
-        try JSONEncoder.pretty.encode(identity).write(to: url, options: .atomic)
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        try writeDataIfChanged(JSONEncoder.pretty.encode(identity), to: url)
     }
 
     private func writeFilesManifest(dotfiles: [Dotfile], under storageRoot: URL) throws {
@@ -264,8 +268,7 @@ final class FolderSyncProvider: SyncProviderProtocol {
             .appendingPathComponent(identity.id + ".json")
         try SyncPathSecurity.ensureContained(url, in: storageRoot)
         try FileManager.default.createSecureDirectory(at: url.deletingLastPathComponent())
-        try JSONEncoder.pretty.encode(manifest).write(to: url, options: .atomic)
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        try writeDataIfChanged(JSONEncoder.pretty.encode(manifest), to: url)
     }
 
     private func writeVersion(dotfile: Dotfile, localURL: URL, remoteURL: URL, storageRoot: URL) throws {
@@ -297,8 +300,7 @@ final class FolderSyncProvider: SyncProviderProtocol {
             localModifiedAt: modificationDate(at: localURL),
             storedModifiedAt: modificationDate(at: remoteURL)
         )
-        try JSONEncoder.pretty.encode(manifest).write(to: manifestURL, options: .atomic)
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: manifestURL.path)
+        try writeDataIfChanged(JSONEncoder.pretty.encode(manifest), to: manifestURL)
     }
 }
 

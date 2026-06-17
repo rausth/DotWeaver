@@ -25,6 +25,9 @@ public final class DotfilesViewModel: ObservableObject {
     private var watchers: [String: FileWatcher] = [:]
     private var isLoadingState = false
     private var securityScopedBookmarks: [String: Data] = [:]
+    private var pendingSaveTask: Task<Void, Never>?
+    private var pendingChangedPaths: Set<String> = []
+    private var pendingChangeTask: Task<Void, Never>?
 
     public convenience init() {
         let defaultProviders: [SyncProvider: SyncProviderProtocol] = [
@@ -47,6 +50,16 @@ public final class DotfilesViewModel: ObservableObject {
     }
 
     public func save() {
+        guard !isLoadingState else { return }
+        pendingSaveTask?.cancel()
+        pendingSaveTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard !Task.isCancelled else { return }
+            self?.saveNow()
+        }
+    }
+
+    private func saveNow() {
         guard !isLoadingState else { return }
         StateManager.saveState(currentState())
     }
@@ -103,10 +116,7 @@ public final class DotfilesViewModel: ObservableObject {
     }
 
     private func mergedSecurityScopedBookmarks() -> [String: Data] {
-        var bookmarks = securityScopedBookmarks
-        StateManager.loadState().securityScopedBookmarks.forEach { bookmarks[$0.key] = $0.value }
-        securityScopedBookmarks = bookmarks
-        return bookmarks
+        securityScopedBookmarks
     }
 
     public var selectedSyncMachineLabel: String {
@@ -122,25 +132,26 @@ public final class DotfilesViewModel: ObservableObject {
 
     public func refreshAvailableMachines() async {
         guard let provider = providers[selectedProvider], provider.capabilities.contains(.machineDiscovery) else {
-            availableMachines = (try? [MachineIdentity.current()]) ?? []
+            setAvailableMachinesIfChanged((try? [MachineIdentity.current()]) ?? [])
             return
         }
 
         do {
             let machines = try await provider.listMachines()
-            availableMachines = machines
+            var refreshedMachines = machines
             let currentID = try MachineIdentity.current().id
             let selected = selectedSyncMachineID.trimmingCharacters(in: .whitespacesAndNewlines)
             if !selected.isEmpty && !machines.contains(where: { $0.id == selected }) {
                 selectedSyncMachineID = ""
             }
-            if !availableMachines.contains(where: { $0.id == currentID }),
+            if !refreshedMachines.contains(where: { $0.id == currentID }),
                let current = try? MachineIdentity.current() {
-                availableMachines.insert(current, at: 0)
+                refreshedMachines.insert(current, at: 0)
             }
+            setAvailableMachinesIfChanged(refreshedMachines)
         } catch {
             if let current = try? MachineIdentity.current() {
-                availableMachines = [current]
+                setAvailableMachinesIfChanged([current])
             }
             statusMessage = "Could not load machines: \(error.localizedDescription)"
         }
@@ -182,7 +193,7 @@ public final class DotfilesViewModel: ObservableObject {
         
         do {
             let updated = try await provider.syncBidirectional(dotfiles: syncableDotfiles)
-            self.dotfiles = mergeSyncedDotfiles(updated)
+            setDotfilesIfChanged(mergeSyncedDotfiles(updated))
             statusMessage = "✅ Sync completed successfully"
             addActivityLog(message: "Synchronized with \(selectedProvider.title) from \(selectedSyncMachineLabel)", type: .sync)
             await refreshAvailableMachines()
@@ -251,29 +262,52 @@ public final class DotfilesViewModel: ObservableObject {
     }
     
     public func startWatchingDotfiles() {
-        // Stop existing watchers
-        for watcher in watchers.values {
+        let monitoredPaths = Set(dotfiles.filter(\.isMonitored).map(\.path))
+        guard Set(watchers.keys) != monitoredPaths else { return }
+
+        for (path, watcher) in watchers where !monitoredPaths.contains(path) {
             watcher.stop()
+            watchers.removeValue(forKey: path)
         }
-        watchers.removeAll()
-        
-        // Start new watchers for monitored files
-        for dotfile in dotfiles where dotfile.isMonitored {
-            let watcher = FileWatcher(path: dotfile.path) { [weak self] in
+
+        for path in monitoredPaths where watchers[path] == nil {
+            let watcher = FileWatcher(path: path) { [weak self] in
                 Task { @MainActor [weak self] in
-                    self?.handleFileChange(at: dotfile.path)
+                    self?.handleFileChange(at: path)
                 }
             }
             watcher.start()
-            watchers[dotfile.path] = watcher
+            watchers[path] = watcher
         }
     }
     
     private func handleFileChange(at path: String) {
-        if let index = dotfiles.firstIndex(where: { $0.path == path }) {
-            dotfiles[index].status = .modified
-            addActivityLog(message: "Local change detected: \((path as NSString).lastPathComponent)", type: .edit)
-            // Save is handled by didSet
+        pendingChangedPaths.insert(path)
+        pendingChangeTask?.cancel()
+        pendingChangeTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
+            self?.flushPendingFileChanges()
+        }
+    }
+
+    private func flushPendingFileChanges() {
+        let changedPaths = pendingChangedPaths
+        pendingChangedPaths.removeAll()
+        pendingChangeTask = nil
+        guard !changedPaths.isEmpty else { return }
+
+        var updated = dotfiles
+        var changedFileNames: [String] = []
+        for path in changedPaths {
+            guard let index = updated.firstIndex(where: { $0.path == path }), updated[index].status != .modified else { continue }
+            updated[index].status = .modified
+            changedFileNames.append((path as NSString).lastPathComponent)
+        }
+
+        setDotfilesIfChanged(updated)
+        for fileName in changedFileNames.sorted() {
+            addActivityLog(message: "Local change detected: \(fileName)", type: .edit)
         }
     }
     
@@ -288,6 +322,16 @@ public final class DotfilesViewModel: ObservableObject {
 
     private func currentProviderRootPath() -> String? {
         selectedProvider == .git ? gitLocalPath : cloudSyncPath
+    }
+
+    private func setDotfilesIfChanged(_ updated: [Dotfile]) {
+        guard dotfiles != updated else { return }
+        dotfiles = updated
+    }
+
+    private func setAvailableMachinesIfChanged(_ updated: [MachineIdentity]) {
+        guard availableMachines != updated else { return }
+        availableMachines = updated
     }
 
     private func mergeSyncedDotfiles(_ synced: [Dotfile]) -> [Dotfile] {
