@@ -413,6 +413,21 @@ final class DotWeaverKitTests: XCTestCase {
         XCTAssertFalse(rendered.contains("{{ARCHITECTURE}}"))
     }
 
+    func testAppStateDefaultsToDisabledScheduledSync() throws {
+        let data = try JSONEncoder().encode(AppState())
+        let decoded = try JSONDecoder().decode(AppState.self, from: data)
+
+        XCTAssertFalse(decoded.syncSchedule.enabled)
+        XCTAssertEqual(decoded.syncSchedule.intervalSeconds, 300)
+        XCTAssertTrue(decoded.syncSchedule.createBackupBeforeSync)
+    }
+
+    func testSyncScheduleEnforcesMinimumInterval() {
+        let schedule = SyncSchedule(enabled: true, intervalSeconds: 5)
+
+        XCTAssertEqual(schedule.intervalSeconds, SyncSchedule.minimumIntervalSeconds)
+    }
+
     func testSnapshotCanRestoreSingleFile() throws {
         let tempRoot = try makeTemporaryDirectory()
         let first = tempRoot.appendingPathComponent(".first")
@@ -549,6 +564,60 @@ final class DotWeaverKitTests: XCTestCase {
         XCTAssertEqual(item.snapshot.entries.first?.originalPath, target.path)
     }
 
+    @MainActor
+    func testFolderProviderSkipsUnchangedRemoteWritesAndVersions() async throws {
+        let tempRoot = try makeTemporaryDirectory()
+        let storageRoot = tempRoot.appendingPathComponent("Provider")
+        let localFile = tempRoot.appendingPathComponent(".zshrc")
+        let dotfile = Dotfile(path: localFile.path)
+
+        try FileManager.default.createDirectory(at: storageRoot, withIntermediateDirectories: true)
+        try "export TEST=1\n".write(to: localFile, atomically: true, encoding: .utf8)
+
+        let provider = FolderSyncProvider(name: .onedrive, storageRootProvider: { storageRoot.path })
+        _ = try await provider.syncBidirectional(dotfiles: [dotfile])
+
+        let machineID = try MachineIdentity.current().id
+        let storedFile = SyncStoragePaths.remoteFileURL(forLocalFile: localFile, storageRoot: storageRoot, machineID: machineID)
+        let initialStoredModified = try modificationDate(storedFile)
+        let versionsRoot = storageRoot
+            .appendingPathComponent(".dotweaver/versions")
+            .appendingPathComponent(SyncStoragePaths.relativeStoragePath(for: localFile).urlSafeBase64())
+        XCTAssertEqual(try directories(under: versionsRoot).count, 1)
+
+        try await Task.sleep(nanoseconds: 1_100_000_000)
+        _ = try await provider.syncBidirectional(dotfiles: [dotfile])
+
+        XCTAssertEqual(try String(contentsOf: storedFile, encoding: .utf8), "export TEST=1\n")
+        XCTAssertEqual(try modificationDate(storedFile), initialStoredModified)
+        XCTAssertEqual(try directories(under: versionsRoot).count, 1)
+    }
+
+    @MainActor
+    func testFolderProviderWritesNewVersionWhenLocalContentChanges() async throws {
+        let tempRoot = try makeTemporaryDirectory()
+        let storageRoot = tempRoot.appendingPathComponent("Provider")
+        let localFile = tempRoot.appendingPathComponent(".zprofile")
+        let dotfile = Dotfile(path: localFile.path)
+
+        try FileManager.default.createDirectory(at: storageRoot, withIntermediateDirectories: true)
+        try "export TEST=1\n".write(to: localFile, atomically: true, encoding: .utf8)
+
+        let provider = FolderSyncProvider(name: .onedrive, storageRootProvider: { storageRoot.path })
+        _ = try await provider.syncBidirectional(dotfiles: [dotfile])
+
+        let versionsRoot = storageRoot
+            .appendingPathComponent(".dotweaver/versions")
+            .appendingPathComponent(SyncStoragePaths.relativeStoragePath(for: localFile).urlSafeBase64())
+        XCTAssertEqual(try directories(under: versionsRoot).count, 1)
+
+        try await Task.sleep(nanoseconds: 1_100_000_000)
+        try "export TEST=2\n".write(to: localFile, atomically: true, encoding: .utf8)
+        _ = try await provider.syncBidirectional(dotfiles: [dotfile])
+
+        XCTAssertEqual(try directories(under: versionsRoot).count, 2)
+    }
+
     func testAuditLogWritesHashChainFields() throws {
         let tempRoot = try makeTemporaryDirectory()
         setenv("DOTWEAVER_APP_SUPPORT_DIR", tempRoot.path, 1)
@@ -588,6 +657,22 @@ final class DotWeaverKitTests: XCTestCase {
             }
             return nil
         })
+    }
+
+    private func directories(under url: URL) throws -> [URL] {
+        guard FileManager.default.fileExists(atPath: url.path) else { return [] }
+        return try FileManager.default.contentsOfDirectory(
+            at: url,
+            includingPropertiesForKeys: nil
+        ).filter { item in
+            var isDirectory: ObjCBool = false
+            return FileManager.default.fileExists(atPath: item.path, isDirectory: &isDirectory) && isDirectory.boolValue
+        }
+    }
+
+    private func modificationDate(_ url: URL) throws -> Date {
+        let attrs = try FileManager.default.attributesOfItem(atPath: url.path)
+        return try XCTUnwrap(attrs[.modificationDate] as? Date)
     }
 
     private func writeProviderSnapshot(

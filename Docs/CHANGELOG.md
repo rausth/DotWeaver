@@ -101,16 +101,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sparkle dependency, app bundle metadata, universal release packaging, optional notarization workflow, and appcast generation scripts.
 
 ### Planned for v1.1.0
+- Scheduled automatic sync with optional pre-sync backups
+- Backup and restore workflows built on snapshots
 - Passkey authentication for provider login
 - Team/shared dotfile repositories
-- VS Code extension
-- Cross-platform CLI (Windows/Linux)
+- Linux-native CLI and packaging plan
 
 ### Planned for v1.2.0
 - Plugin system for custom providers
 - Visual diff and merge interface
-- Scheduled automatic sync
-- Backup and restore functionality
+
+### Linux native version plan
+- Split portable sync, snapshot, vault, and provider logic into a Linux-buildable core target.
+- Replace macOS-only Keychain, LocalAuthentication, security-scoped bookmarks, Sparkle, and SwiftUI integrations behind platform adapters.
+- Ship Linux first as a native `dw` CLI with systemd user timer support for scheduled sync.
+- Use Secret Service/libsecret or file-backed encrypted vault storage depending on desktop/server availability.
+- Package as tarball, Debian package, and RPM after CLI parity is verified.
 
 ---
 
