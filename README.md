@@ -195,18 +195,34 @@ The app and CLI share `DotWeaverKit`, keeping provider sync, snapshots, vault lo
 
 See [CHANGELOG](Docs/CHANGELOG.md) for release history and planned work.
 
-Planned for v1.1.0:
+Current v1.0.1 status:
 
-- Scheduled automatic sync with optional pre-sync backups.
-- Backup and restore workflows built on snapshots.
+- Core macOS app, CLI, provider sync, snapshots, scheduled sync, pre-sync backups, vault encryption, Sparkle packaging, and local release validation are implemented.
+- GitHub/ad-hoc distribution is ready.
+- Apple notarization is the top remaining release task.
+
+Next priority:
+
+- Configure Apple Developer signing and notarization secrets:
+  - `MACOS_CERTIFICATE_P12_BASE64`
+  - `MACOS_CERTIFICATE_PASSWORD`
+  - `DEVELOPER_ID_APPLICATION`
+  - `APPLE_ID`
+  - `APPLE_TEAM_ID`
+  - `APPLE_APP_SPECIFIC_PASSWORD`
+- Run release validation after notarization is enabled.
+
+Planned v1.x growth work:
+
+- External security audit before broader public distribution.
+- Full Mackup application preset catalog.
+- Advanced chezmoi template/script compatibility.
 - Passkey authentication for provider login.
 - Team/shared dotfile repositories.
 - Linux-native CLI and packaging plan.
-
-Planned for v1.2.0:
-
 - Plugin system for custom providers.
 - Visual diff and merge interface.
+- Embedded SDK/native-library WebDAV/SFTP/FTPS/S3 clients if direct SDK integration becomes necessary.
 
 Linux-native work is planned as a CLI-first port with platform adapters for credentials, scheduling, and packaging.
 
