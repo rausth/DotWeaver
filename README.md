@@ -76,10 +76,10 @@ Use DotWeaver when you want:
 
 ### Built With
 
-- [Swift 6.0][swift-url]
-- [SwiftUI][swiftui-url]
-- [Sparkle 2.9.1][sparkle-url]
-- [macOS 14+][macos-url]
+- [![Swift][Swift]][Swift-url]
+- [![SwiftUI][SwiftUI]][SwiftUI-url]
+- [![Sparkle][Sparkle]][Sparkle-url]
+- [![macOS][macOS]][macOS-url]
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -294,6 +294,11 @@ Issues: [https://github.com/rausth/DotWeaver/issues](https://github.com/rausth/D
 [swift-shield]: https://img.shields.io/badge/Swift-6.0-orange?style=for-the-badge&logo=swift&logoColor=white
 [swift-url]: https://www.swift.org/
 [product-screenshot]: Docs/assets/screenshots/dotweaver-dashboard.jpg
-[swiftui-url]: https://developer.apple.com/xcode/swiftui/
-[sparkle-url]: https://sparkle-project.org/
-[macos-url]: https://www.apple.com/macos/
+[Swift]: https://img.shields.io/badge/Swift-6.0-orange?style=for-the-badge&logo=swift&logoColor=white
+[Swift-url]: https://www.swift.org/
+[SwiftUI]: https://img.shields.io/badge/SwiftUI-native-blue?style=for-the-badge&logo=swift&logoColor=white
+[SwiftUI-url]: https://developer.apple.com/xcode/swiftui/
+[Sparkle]: https://img.shields.io/badge/Sparkle-2.9.1-blue?style=for-the-badge
+[Sparkle-url]: https://sparkle-project.org/
+[macOS]: https://img.shields.io/badge/macOS-14%2B-black?style=for-the-badge&logo=apple
+[macOS-url]: https://www.apple.com/macos/
