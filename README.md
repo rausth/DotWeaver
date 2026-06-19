@@ -74,15 +74,6 @@ Use DotWeaver when you want:
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-### Built With
-
-- [![Swift][Swift]][Swift-url]
-- [![SwiftUI][SwiftUI]][SwiftUI-url]
-- [![Sparkle][Sparkle]][Sparkle-url]
-- [![macOS][macOS]][macOS-url]
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
 ## Getting Started
 
 ### Prerequisites
